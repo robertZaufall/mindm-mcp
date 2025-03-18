@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mindm_mcp"
-version = "0.0.1.10"
+version = "0.0.1.13"
 authors = [
   { name="Robert Zaufall" },
 ]
@@ -20,7 +20,6 @@ classifiers = [
 
 dependencies = [
   "mindm>=0.0.3.8",
-  "fastapi>=0.95.1",
   "uvicorn>=0.22.0",
   "aiohttp>=3.8.4",
   "pydantic>=1.10.7",
@@ -40,15 +39,7 @@ dev = [
 "Bug Tracker" = "https://github.com/robertZaufall/mindm_mcp/issues"
 
 [project.scripts]
-mindm-mcp-server = "mindm_mcp.main:start_server"
-mindm-claude-integration = "mindm_mcp.claude_integration:run_integration"
-mindm-mcp = "mindm_mcp.combined:start_services"
-mindm-direct = "mindm_mcp.direct_integration:run_direct_integration"
-mindm-simple = "mindm_mcp.mindm_direct:run_direct"
+mindm-mcp-server = "mindm_mcp.server:main"
 
 [tool.setuptools]
-packages = ["mindm_mcp", "mindm_mcp.examples"]
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
+packages = ["mindm_mcp"]

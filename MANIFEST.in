@@ -6,4 +6,5 @@ global-exclude MANIFEST.in
 global-exclude update_version.py
 global-exclude CLAUDE.md
 global-exclude Makefile
-
+global-exclude examples/*
+global-exclude assets/*

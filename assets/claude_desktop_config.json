@@ -3,7 +3,7 @@
         "mindm": {
             "command": "/Users/master/miniconda3/envs/mindm-mcp/bin/python",
             "args": [
-                "-m", "mindm_mcp.mindm_direct"
+                "-m", "mindm_mcp.server"
             ]
         }
     }

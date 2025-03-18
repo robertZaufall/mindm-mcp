@@ -1,0 +1,4911 @@
+Directory structure:
+└── mindm-mcp/
+    ├── README.md
+    ├── LICENSE
+    ├── pyproject.toml
+    ├── update_version.py
+    └── mindm_mcp/
+        ├── __init__.py
+        ├── claude_integration.py
+        ├── client.py
+        ├── combined.py
+        ├── direct_integration.py
+        ├── main.py
+        ├── mcp_plugin.py
+        ├── mindm_direct.py
+        ├── server.py
+        └── examples/
+            ├── basic_client_example.py
+            └── claude_mcp_example.py
+
+================================================
+File: README.md
+================================================
+# MindManager MCP
+
+MindManager MCP (Model Context Protocol) is a server and client library that enables AI assistants like Claude to interact with MindManager through the [mindm](https://github.com/robertZaufall/mindm) Python library.
+
+[![PyPI version](https://img.shields.io/pypi/v/mindm_mcp.svg)](https://pypi.org/project/mindm_mcp/)
+
+## Features
+
+- RESTful API for interacting with MindManager
+- WebSocket support for real-time communication
+- Model Context Protocol (MCP) integration for Claude Desktop
+- Client library for Python applications
+- Async and sync client interfaces
+
+## Installation
+
+Install using `pip`:
+
+```bash
+pip install mindm_mcp
+```
+
+This package requires MindManager to be installed on your system, as it interacts with the MindManager application through the [mindm](https://github.com/robertZaufall/mindm) library.
+
+## Quick Start
+
+### Starting the MCP Server
+
+To start the MindManager MCP server:
+
+```bash
+mindm-mcp-server --host 127.0.0.1 --port 8000
+```
+
+### Using the Client Library
+
+```python
+from mindm_mcp.client import SyncMindManagerClientContext
+
+# Use the client with a context manager for automatic cleanup
+with SyncMindManagerClientContext() as client:
+    # Create a session
+    client.create_session()
+    
+    # Get the current mindmap
+    result = client.get_mindmap()
+    if result["success"]:
+        mindmap = result["data"]["mindmap"]
+        print(f"Central topic: {mindmap['text']}")
+    
+    # Add a topic
+    client.add_topic("New Topic", notes="This is a note for the new topic")
+```
+
+### Claude Desktop Integration
+
+To enable Claude Desktop to interact with MindManager:
+
+1. Start the MindManager MCP server:
+   ```bash
+   mindm-mcp-server
+   ```
+
+2. Start the Claude Desktop integration:
+   ```bash
+   mindm-claude-integration --port 8090
+   ```
+
+3. Configure Claude Desktop to use the MCP plugin at `localhost:8090`
+
+## API Reference
+
+### REST API Endpoints
+
+- `POST /sessions` - Create a new MindManager session
+- `GET /sessions/{session_id}` - Get session information
+- `DELETE /sessions/{session_id}` - Delete a session
+- `POST /sessions/{session_id}/get_mindmap` - Get the current mindmap
+- `POST /sessions/{session_id}/create_mindmap` - Create a new mindmap
+- `POST /sessions/{session_id}/add_topic` - Add a topic to the mindmap
+- `POST /sessions/{session_id}/update_topic` - Update an existing topic
+- `POST /sessions/{session_id}/add_relationship` - Add a relationship between topics
+- `POST /sessions/{session_id}/add_tag` - Add a tag to a topic
+- `POST /sessions/{session_id}/serialize_mindmap` - Serialize the mindmap to a specific format
+
+### MCP Actions
+
+The following actions are supported through the Model Context Protocol:
+
+- `get_mindmap` - Get the current mindmap
+- `create_mindmap` - Create a new mindmap
+- `add_topic` - Add a topic to the mindmap
+- `update_topic` - Update an existing topic
+- `add_relationship` - Add a relationship between topics
+- `add_tag` - Add a tag to a topic
+- `serialize_mindmap` - Serialize the mindmap to a specific format
+
+## Examples
+
+### Basic Client Example
+
+```python
+import asyncio
+from mindm_mcp.client import MindManagerClientContext
+
+async def main():
+    async with MindManagerClientContext() as client:
+        # Create a session
+        await client.create_session()
+        
+        # Get the current mindmap
+        result = await client.get_mindmap()
+        if result["success"]:
+            mindmap = result["data"]["mindmap"]
+            print(f"Central topic: {mindmap['text']}")
+            
+            # Add a subtopic
+            topic_result = await client.add_topic(
+                text="New Subtopic",
+                parent_guid=mindmap["guid"],
+                notes="This is a sample subtopic",
+            )
+            
+            if topic_result["success"]:
+                print(f"Added topic with GUID: {topic_result['data']['guid']}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Claude MCP Example
+
+```python
+import json
+import asyncio
+import socket
+import struct
+
+async def send_mcp_request(host, port, action, params):
+    # Connect to the MCP server
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((host, port))
+    
+    # Create request
+    request = {
+        "action": action,
+        "params": params,
+    }
+    request_json = json.dumps(request)
+    request_bytes = request_json.encode("utf-8")
+    
+    # Send request length and data
+    sock.sendall(len(request_bytes).to_bytes(4, byteorder="little", signed=False))
+    sock.sendall(request_bytes)
+    
+    # Receive response length
+    length_bytes = sock.recv(4)
+    length = int.from_bytes(length_bytes, byteorder="little", signed=False)
+    
+    # Receive response data
+    response_bytes = sock.recv(length)
+    response_json = response_bytes.decode("utf-8")
+    response = json.loads(response_json)
+    
+    # Close connection
+    sock.close()
+    
+    return response
+
+async def main():
+    # Get the current mindmap
+    result = await send_mcp_request("localhost", 8090, "get_mindmap", {})
+    
+    if result["success"]:
+        mindmap = result["data"]["mindmap"]
+        print(f"Central topic: {mindmap['text']}")
+        
+        # Add a new topic
+        topic_result = await send_mcp_request(
+            "localhost",
+            8090,
+            "add_topic",
+            {
+                "text": "Added by MCP",
+                "notes": "This topic was added through the Model Context Protocol",
+            },
+        )
+        
+        if topic_result["success"]:
+            print(f"Added topic with GUID: {topic_result['data']['guid']}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+
+
+================================================
+File: LICENSE
+================================================
+MIT License
+
+Copyright (c) [2025] [Robert Zaufall]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+
+================================================
+File: pyproject.toml
+================================================
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mindm_mcp"
+version = "0.0.1.10"
+authors = [
+  { name="Robert Zaufall" },
+]
+description = "Model Context Protocol (MCP) server for the mindm library, enabling AI assistants like Claude to interact with MindManager."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS :: MacOS X",
+]
+
+dependencies = [
+  "mindm>=0.0.3.8",
+  "fastapi>=0.95.1",
+  "uvicorn>=0.22.0",
+  "aiohttp>=3.8.4",
+  "pydantic>=1.10.7",
+  "websockets>=10.4",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0",
+  "pytest-asyncio>=0.20.0",
+  "black",
+  "flake8",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/robertZaufall/mindm_mcp"
+"Bug Tracker" = "https://github.com/robertZaufall/mindm_mcp/issues"
+
+[project.scripts]
+mindm-mcp-server = "mindm_mcp.main:start_server"
+mindm-claude-integration = "mindm_mcp.claude_integration:run_integration"
+mindm-mcp = "mindm_mcp.combined:start_services"
+mindm-direct = "mindm_mcp.direct_integration:run_direct_integration"
+mindm-simple = "mindm_mcp.mindm_direct:run_direct"
+
+[tool.setuptools]
+packages = ["mindm_mcp", "mindm_mcp.examples"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+
+
+================================================
+File: update_version.py
+================================================
+#!/usr/bin/env python3
+import re
+
+# Read pyproject.toml
+with open("pyproject.toml", "r") as f:
+    content = f.read()
+
+# Find version and update build number
+version_pattern = r'version = "([\d]+)\.([\d]+)\.([\d]+)\.([\d]+)"'
+version_match = re.search(version_pattern, content)
+
+if version_match:
+    major, minor, patch, build = version_match.groups()
+    new_build = str(int(build) + 1)
+    new_version = f"{major}.{minor}.{patch}.{new_build}"
+    new_content = re.sub(version_pattern, f'version = "{new_version}"', content)
+    
+    # Write updated content back
+    with open("pyproject.toml", "w") as f:
+        f.write(new_content)
+    
+    print(f"Updated version to {new_version}")
+else:
+    print("Version pattern not found in pyproject.toml")
+
+
+================================================
+File: mindm_mcp/__init__.py
+================================================
+# mindm_mcp/__init__.py
+"""
+Model Context Protocol (MCP) server for MindManager.
+
+This package provides a Model Context Protocol server for the mindm library,
+enabling AI assistants like Claude to interact with MindManager.
+"""
+
+import os
+import sys
+
+__version__ = "0.1.0"
+
+# Import main components for easier access
+from mindm_mcp.server import app
+from mindm_mcp.client import (
+    MindManagerClient,
+    MindManagerClientContext,
+    SyncMindManagerClient,
+    SyncMindManagerClientContext,
+)
+from mindm_mcp.mcp_plugin import MindManagerMCPPlugin, MCPServer
+
+# Check if MindManager is installed
+try:
+    import mindm.mindmanager
+except ImportError:
+    print("Warning: mindm library not found. Please install it using: pip install mindm")
+    
+# Public API
+__all__ = [
+    "app",
+    "MindManagerClient",
+    "MindManagerClientContext",
+    "SyncMindManagerClient",
+    "SyncMindManagerClientContext",
+    "MindManagerMCPPlugin",
+    "MCPServer",
+]
+
+
+
+================================================
+File: mindm_mcp/claude_integration.py
+================================================
+# mindm_mcp/claude_integration.py
+"""
+MindManager MCP Integration for Claude Desktop.
+
+This script launches an MCP server that Claude Desktop can connect to for
+interacting with MindManager through the mindm library.
+"""
+
+import os
+import sys
+import asyncio
+import argparse
+import logging
+import signal
+from typing import Dict, Any, Optional
+
+from mindm_mcp.mcp_plugin import MindManagerMCPPlugin, MCPServer
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("mindm-claude-integration")
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="MindManager MCP Integration for Claude Desktop")
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="localhost",
+        help="Host to bind the MCP server to (default: localhost)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8090,
+        help="Port to bind the MCP server to (default: 8090)",
+    )
+    parser.add_argument(
+        "--server-url",
+        type=str,
+        default="http://127.0.0.1:8000",
+        help="URL of the MindManager MCP server (default: http://127.0.0.1:8000)",
+    )
+    return parser.parse_args()
+
+async def main():
+    """Main entry point."""
+    args = parse_arguments()
+    
+    # Create the plugin
+    plugin = MindManagerMCPPlugin(base_url=args.server_url)
+    
+    # Create and start the server
+    server = MCPServer(plugin, host=args.host, port=args.port)
+    
+    # Set up signal handlers for graceful shutdown
+    loop = asyncio.get_running_loop()
+    
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, lambda: asyncio.create_task(server.stop()))
+    
+    # Run the server
+    try:
+        # Log to stderr to avoid interfering with MCP protocol
+        print(f"Starting MindManager MCP Integration on {args.host}:{args.port}", file=sys.stderr)
+        print(f"Using MindManager MCP server at {args.server_url}", file=sys.stderr)
+        print("Press Ctrl+C to stop the server", file=sys.stderr)
+        
+        await server.start()
+    
+    except Exception as e:
+        logger.error(f"Error running MCP server: {e}")
+        return 1
+    
+    return 0
+
+def run_integration():
+    """
+    Entry point for the console script.
+    This function is called when running mindm-claude-integration from the command line.
+    """
+    try:
+        return asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Integration stopped by user")
+        return 0
+    except Exception as e:
+        logger.error(f"Error running integration: {e}")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(run_integration())
+
+
+================================================
+File: mindm_mcp/client.py
+================================================
+# mindm_mcp/client.py
+"""
+Client library for interacting with the MindManager MCP Server.
+
+This module provides a convenient Python API for applications to communicate
+with the MindManager MCP Server, enabling remote control of MindManager.
+"""
+
+import json
+import logging
+import asyncio
+import aiohttp
+from typing import Dict, List, Optional, Any, Union
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("mindm-mcp-client")
+
+class MindManagerClient:
+    """Client for interacting with MindManager through the MCP Server."""
+    
+    def __init__(self, base_url: str = "http://127.0.0.1:8000"):
+        """
+        Initialize the MindManager client.
+        
+        Args:
+            base_url: URL of the MindManager MCP Server
+        """
+        self.base_url = base_url
+        self.session_id = None
+        self._http_session = None
+    
+    async def _ensure_session(self):
+        """Ensure HTTP session is initialized."""
+        if self._http_session is None:
+            self._http_session = aiohttp.ClientSession()
+    
+    async def close(self):
+        """Close the HTTP session."""
+        if self._http_session:
+            await self._http_session.close()
+            self._http_session = None
+    
+    async def create_session(self, charttype: str = "auto", turbo_mode: bool = False) -> str:
+        """
+        Create a new MindManager session.
+        
+        Args:
+            charttype: Chart type (auto, radial, orgchart)
+            turbo_mode: Enable turbo mode for faster processing
+            
+        Returns:
+            str: Session ID
+        """
+        await self._ensure_session()
+        
+        async with self._http_session.post(
+            f"{self.base_url}/sessions",
+            json={"charttype": charttype, "turbo_mode": turbo_mode},
+        ) as response:
+            if response.status == 200:
+                data = await response.json()
+                self.session_id = data["session_id"]
+                return self.session_id
+            else:
+                error_text = await response.text()
+                logger.error(f"Failed to create session: {error_text}")
+                raise Exception(f"Failed to create session: {error_text}")
+    
+    async def get_session_info(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get information about a session.
+        
+        Args:
+            session_id: Session ID (uses the current session if not provided)
+            
+        Returns:
+            Dict: Session information
+        """
+        await self._ensure_session()
+        session_id = session_id or self.session_id
+        
+        if not session_id:
+            raise ValueError("No session ID provided and no current session")
+        
+        async with self._http_session.get(
+            f"{self.base_url}/sessions/{session_id}",
+        ) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                error_text = await response.text()
+                logger.error(f"Failed to get session info: {error_text}")
+                raise Exception(f"Failed to get session info: {error_text}")
+    
+    async def delete_session(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Delete a session.
+        
+        Args:
+            session_id: Session ID (uses the current session if not provided)
+            
+        Returns:
+            Dict: Status information
+        """
+        await self._ensure_session()
+        session_id = session_id or self.session_id
+        
+        if not session_id:
+            raise ValueError("No session ID provided and no current session")
+        
+        async with self._http_session.delete(
+            f"{self.base_url}/sessions/{session_id}",
+        ) as response:
+            if response.status == 200:
+                if session_id == self.session_id:
+                    self.session_id = None
+                return await response.json()
+            else:
+                error_text = await response.text()
+                logger.error(f"Failed to delete session: {error_text}")
+                raise Exception(f"Failed to delete session: {error_text}")
+    
+    async def get_mindmap(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get the current mindmap.
+        
+        Args:
+            session_id: Session ID (uses the current session if not provided)
+            
+        Returns:
+            Dict: Mindmap data
+        """
+        await self._ensure_session()
+        session_id = session_id or self.session_id
+        
+        if not session_id:
+            raise ValueError("No session ID provided and no current session")
+        
+        async with self._http_session.post(
+            f"{self.base_url}/sessions/{session_id}/get_mindmap",
+        ) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                error_text = await response.text()
+                logger.error(f"Failed to get mindmap: {error_text}")
+                raise Exception(f"Failed to get mindmap: {error_text}")
+    
+    async def create_mindmap(
+        self,
+        central_topic: str,
+        topics: List[Dict[str, Any]] = None,
+        relationships: List[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a new mindmap.
+        
+        Args:
+            central_topic: Text for the central topic
+            topics: List of topic data dictionaries
+            relationships: List of relationship dictionaries
+            session_id: Session ID (uses the current session if not provided)
+            
+        Returns:
+            Dict: Status information
+        """
+        await self._ensure_session()
+        session_id = session_id or self.session_id
+        
+        if not session_id:
+            raise ValueError("No session ID provided and no current session")
+        
+        topics = topics or []
+        relationships = relationships or []
+        
+        async with self._http_session.post(
+            f"{self.base_url}/sessions/{session_id}/create_mindmap",
+            json={
+                "central_topic": central_topic,
+                "topics": topics,
+                "relationships": relationships,
+            },
+        ) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                error_text = await response.text()
+                logger.error(f"Failed to create mindmap: {error_text}")
+                raise Exception(f"Failed to create mindmap: {error_text}")
+    
+    async def add_topic(
+        self,
+        text: str,
+        parent_guid: Optional[str] = None,
+        notes: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Add a topic to the mindmap.
+        
+        Args:
+            text: Topic text
+            parent_guid: GUID of the parent topic (uses central topic if not provided)
+            notes: Topic notes
+            session_id: Session ID (uses the current session if not provided)
+            
+        Returns:
+            Dict: Status information with the created topic's GUID
+        """
+        await self._ensure_session()
+        session_id = session_id or self.session_id
+        
+        if not session_id:
+            raise ValueError("No session ID provided and no current session")
+        
+        data = {
+            "text": text,
+            "parent_guid": parent_guid,
+        }
+        
+        if notes is not None:
+            data["notes"] = notes
+        
+        async with self._http_session.post(
+            f"{self.base_url}/sessions/{session_id}/add_topic",
+            json=data,
+        ) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                error_text = await response.text()
+                logger.error(f"Failed to add topic: {error_text}")
+                raise Exception(f"Failed to add topic: {error_text}")
+    
+    async def update_topic(
+        self,
+        guid: str,
+        text: Optional[str] = None,
+        notes: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Update an existing topic.
+        
+        Args:
+            guid: Topic GUID
+            text: New topic text (if None, keeps existing text)
+            notes: New topic notes (if None, keeps existing notes)
+            session_id: Session ID (uses the current session if not provided)
+            
+        Returns:
+            Dict: Status information
+        """
+        await self._ensure_session()
+        session_id = session_id or self.session_id
+        
+        if not session_id:
+            raise ValueError("No session ID provided and no current session")
+        
+        data = {
+            "guid": guid,
+        }
+        
+        if text is not None:
+            data["text"] = text
+        
+        if notes is not None:
+            data["notes"] = notes
+        
+        async with self._http_session.post(
+            f"{self.base_url}/sessions/{session_id}/update_topic",
+            json=data,
+        ) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                error_text = await response.text()
+                logger.error(f"Failed to update topic: {error_text}")
+                raise Exception(f"Failed to update topic: {error_text}")
+    
+    async def add_relationship(
+        self,
+        guid_1: str,
+        guid_2: str,
+        label: str = "",
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Add a relationship between topics.
+        
+        Args:
+            guid_1: GUID of the first topic
+            guid_2: GUID of the second topic
+            label: Relationship label
+            session_id: Session ID (uses the current session if not provided)
+            
+        Returns:
+            Dict: Status information
+        """
+        await self._ensure_session()
+        session_id = session_id or self.session_id
+        
+        if not session_id:
+            raise ValueError("No session ID provided and no current session")
+        
+        async with self._http_session.post(
+            f"{self.base_url}/sessions/{session_id}/add_relationship",
+            json={
+                "guid_1": guid_1,
+                "guid_2": guid_2,
+                "label": label,
+            },
+        ) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                error_text = await response.text()
+                logger.error(f"Failed to add relationship: {error_text}")
+                raise Exception(f"Failed to add relationship: {error_text}")
+    
+    async def add_tag(
+        self,
+        topic_guid: str,
+        tag_text: str,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Add a tag to a topic.
+        
+        Args:
+            topic_guid: Topic GUID
+            tag_text: Tag text
+            session_id: Session ID (uses the current session if not provided)
+            
+        Returns:
+            Dict: Status information
+        """
+        await self._ensure_session()
+        session_id = session_id or self.session_id
+        
+        if not session_id:
+            raise ValueError("No session ID provided and no current session")
+        
+        async with self._http_session.post(
+            f"{self.base_url}/sessions/{session_id}/add_tag",
+            json={
+                "topic_guid": topic_guid,
+                "tag_text": tag_text,
+            },
+        ) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                error_text = await response.text()
+                logger.error(f"Failed to add tag: {error_text}")
+                raise Exception(f"Failed to add tag: {error_text}")
+    
+    async def serialize_mindmap(
+        self,
+        format_type: str = "mermaid",
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Serialize the current mindmap to a specified format.
+        
+        Args:
+            format_type: Format to serialize to (mermaid, markdown, json)
+            session_id: Session ID (uses the current session if not provided)
+            
+        Returns:
+            Dict: Serialized mindmap data
+        """
+        await self._ensure_session()
+        session_id = session_id or self.session_id
+        
+        if not session_id:
+            raise ValueError("No session ID provided and no current session")
+        
+        params = {"format_type": format_type}
+        
+        async with self._http_session.post(
+            f"{self.base_url}/sessions/{session_id}/serialize_mindmap",
+            params=params,
+        ) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                error_text = await response.text()
+                logger.error(f"Failed to serialize mindmap: {error_text}")
+                raise Exception(f"Failed to serialize mindmap: {error_text}")
+
+# Async context manager for MindManagerClient
+class MindManagerClientContext:
+    """Context manager for MindManagerClient to ensure proper resource cleanup."""
+    
+    def __init__(self, base_url: str = "http://127.0.0.1:8000"):
+        self.client = MindManagerClient(base_url)
+    
+    async def __aenter__(self):
+        return self.client
+    
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.client.close()
+
+# Synchronous wrapper for MindManagerClient
+class SyncMindManagerClient:
+    """
+    Synchronous wrapper for MindManagerClient.
+    
+    This class provides a synchronous API for applications that do not use asyncio.
+    """
+    
+    def __init__(self, base_url: str = "http://127.0.0.1:8000"):
+        """
+        Initialize the synchronous MindManager client.
+        
+        Args:
+            base_url: URL of the MindManager MCP Server
+        """
+        self.base_url = base_url
+        self.client = MindManagerClient(base_url)
+        self.session_id = None
+        self._loop = None
+    
+    def _get_loop(self):
+        """Get or create event loop for synchronous operations."""
+        if self._loop is None:
+            try:
+                self._loop = asyncio.get_event_loop()
+            except RuntimeError:
+                self._loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(self._loop)
+        return self._loop
+    
+    def _run_async(self, coro):
+        """Run coroutine synchronously."""
+        loop = self._get_loop()
+        return loop.run_until_complete(coro)
+    
+    def close(self):
+        """Close the HTTP session."""
+        self._run_async(self.client.close())
+    
+    def create_session(self, charttype: str = "auto", turbo_mode: bool = False) -> str:
+        """
+        Create a new MindManager session.
+        
+        Args:
+            charttype: Chart type (auto, radial, orgchart)
+            turbo_mode: Enable turbo mode for faster processing
+            
+        Returns:
+            str: Session ID
+        """
+        result = self._run_async(self.client.create_session(charttype, turbo_mode))
+        self.session_id = self.client.session_id
+        return result
+    
+    def get_session_info(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get information about a session.
+        
+        Args:
+            session_id: Session ID (uses the current session if not provided)
+            
+        Returns:
+            Dict: Session information
+        """
+        return self._run_async(self.client.get_session_info(session_id or self.session_id))
+    
+    def delete_session(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Delete a session.
+        
+        Args:
+            session_id: Session ID (uses the current session if not provided)
+            
+        Returns:
+            Dict: Status information
+        """
+        result = self._run_async(self.client.delete_session(session_id or self.session_id))
+        if self.session_id == (session_id or self.session_id):
+            self.session_id = None
+        return result
+    
+    # Add synchronous versions of all other methods
+    def get_mindmap(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        return self._run_async(self.client.get_mindmap(session_id or self.session_id))
+    
+    def create_mindmap(
+        self,
+        central_topic: str,
+        topics: List[Dict[str, Any]] = None,
+        relationships: List[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return self._run_async(
+            self.client.create_mindmap(
+                central_topic, topics, relationships, session_id or self.session_id
+            )
+        )
+    
+    def add_topic(
+        self,
+        text: str,
+        parent_guid: Optional[str] = None,
+        notes: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return self._run_async(
+            self.client.add_topic(text, parent_guid, notes, session_id or self.session_id)
+        )
+    
+    def update_topic(
+        self,
+        guid: str,
+        text: Optional[str] = None,
+        notes: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return self._run_async(
+            self.client.update_topic(guid, text, notes, session_id or self.session_id)
+        )
+    
+    def add_relationship(
+        self,
+        guid_1: str,
+        guid_2: str,
+        label: str = "",
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return self._run_async(
+            self.client.add_relationship(guid_1, guid_2, label, session_id or self.session_id)
+        )
+    
+    def add_tag(
+        self,
+        topic_guid: str,
+        tag_text: str,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return self._run_async(
+            self.client.add_tag(topic_guid, tag_text, session_id or self.session_id)
+        )
+    
+    def serialize_mindmap(
+        self,
+        format_type: str = "mermaid",
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return self._run_async(
+            self.client.serialize_mindmap(format_type, session_id or self.session_id)
+        )
+
+# Context manager for SyncMindManagerClient
+class SyncMindManagerClientContext:
+    """Context manager for SyncMindManagerClient to ensure proper resource cleanup."""
+    
+    def __init__(self, base_url: str = "http://127.0.0.1:8000"):
+        self.client = SyncMindManagerClient(base_url)
+    
+    def __enter__(self):
+        return self.client
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.client.close()
+
+
+
+================================================
+File: mindm_mcp/combined.py
+================================================
+#!/usr/bin/env python3
+import subprocess
+import time
+import sys
+import signal
+import asyncio
+import os
+import json
+
+def start_services():
+    """Start both the MCP server and Claude integration services."""
+    # Don't print directly to stdout - Claude Desktop expects JSON
+    print("Starting MindManager MCP combined services...", file=sys.stderr)
+    
+    # Start the MCP server as a subprocess using the Python module path
+    # Use port 8001 instead of the default 8000
+    server_process = subprocess.Popen(
+        [sys.executable, "-m", "mindm_mcp.main", "--port", "8001"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    
+    # Give the server time to start up
+    time.sleep(2)
+    
+    if server_process.poll() is not None:
+        print("Error: MCP Server failed to start", file=sys.stderr)
+        stderr_output = server_process.stderr.read().decode('utf-8')
+        print(f"Server error: {stderr_output}", file=sys.stderr)
+        return 1
+    
+    print("MCP Server started successfully on port 8001", file=sys.stderr)
+    print("Starting Claude integration...", file=sys.stderr)
+    
+    try:
+        # Run the Claude integration in the foreground using the Python module path
+        # Connect to the MCP server on port 8001
+        integration_process = subprocess.Popen(
+            [sys.executable, "-m", "mindm_mcp.claude_integration", "--port", "8090", "--server-url", "http://127.0.0.1:8001"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        # Wait for the integration process to finish
+        integration_process.wait()
+    
+    except KeyboardInterrupt:
+        print("Interrupted by user", file=sys.stderr)
+    
+    finally:
+        # Clean up the server process when done
+        print("Shutting down MCP Server...", file=sys.stderr)
+        if server_process.poll() is None:  # If still running
+            server_process.terminate()
+            try:
+                server_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                server_process.kill()
+    
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(start_services())
+
+
+================================================
+File: mindm_mcp/direct_integration.py
+================================================
+#!/usr/bin/env python3
+"""
+Direct MindManager MCP Integration for Claude Desktop.
+
+This script implements a direct MCP server that Claude Desktop can connect to
+without requiring a separate MindManager MCP server process.
+"""
+
+import os
+import sys
+import asyncio
+import json
+import logging
+import socket
+import struct
+import argparse
+import signal
+from typing import Dict, List, Any, Optional, Tuple
+
+import mindm.mindmanager as mm
+from mindmap.mindmap import MindmapDocument, MindmapTopic, MindmapNotes, MindmapTag
+
+# Configure logging to go to stderr only
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stderr
+)
+logger = logging.getLogger("mindm-direct-integration")
+
+class MindManagerDirectPlugin:
+    """Direct MCP plugin for MindManager."""
+    
+    def __init__(self):
+        """Initialize the MindManager Direct Plugin."""
+        self.document = None
+        self._capabilities = self._build_capabilities()
+    
+    async def initialize(self) -> bool:
+        """
+        Initialize the plugin.
+        
+        Returns:
+            bool: True if initialization was successful, False otherwise
+        """
+        print("Initializing MindManager Direct Plugin", file=sys.stderr)
+        try:
+            # Create MindmapDocument instance
+            self.document = MindmapDocument(charttype="auto", turbo_mode=False)
+            print("Created MindManager document", file=sys.stderr)
+            return True
+        except Exception as e:
+            error_str = str(e)
+            print(f"Failed to initialize MindManager Direct Plugin: {error_str}", file=sys.stderr)
+            
+            # Handle common errors with helpful messages
+            if "declined permission" in error_str:
+                print("\n===== PERMISSION ERROR =====", file=sys.stderr)
+                print("MindManager requires automation permissions on macOS.", file=sys.stderr)
+                print("Please follow these steps:", file=sys.stderr)
+                print("1. Open System Preferences/Settings", file=sys.stderr)
+                print("2. Go to Security & Privacy / Privacy", file=sys.stderr)
+                print("3. Select 'Automation' from the list", file=sys.stderr)
+                print("4. Ensure the checkbox next to 'MindManager' is checked for Terminal and/or Claude", file=sys.stderr)
+                print("5. Restart Claude Desktop and try again", file=sys.stderr)
+                print("============================\n", file=sys.stderr)
+            elif "not found" in error_str and "Applications/MindManager.app" in error_str:
+                print("\n===== APPLICATION ERROR =====", file=sys.stderr)
+                print("MindManager application was not found.", file=sys.stderr)
+                print("Please make sure MindManager is installed and located in the Applications folder.", file=sys.stderr)
+                print("============================\n", file=sys.stderr)
+                
+            return False
+    
+    async def cleanup(self) -> None:
+        """Clean up resources before shutdown."""
+        print("Cleaning up MindManager Direct Plugin", file=sys.stderr)
+    
+    def _build_capabilities(self) -> Dict[str, Any]:
+        """
+        Build the capabilities description for the MCP plugin.
+        
+        Returns:
+            Dict: Capabilities description
+        """
+        return {
+            "name": "mindmanager",
+            "display_name": "MindManager",
+            "description": "Interact with MindManager to create and modify mind maps",
+            "version": "0.1.0",
+            "actions": [
+                {
+                    "name": "get_mindmap",
+                    "description": "Get the current mindmap from MindManager",
+                    "parameters": {},
+                    "returns": {
+                        "mindmap": {
+                            "description": "The current mindmap structure",
+                            "type": "object"
+                        },
+                        "max_topic_level": {
+                            "description": "The maximum topic level in the mindmap",
+                            "type": "integer"
+                        },
+                        "selected_topics": {
+                            "description": "List of currently selected topics",
+                            "type": "array"
+                        },
+                        "central_topic_selected": {
+                            "description": "Whether the central topic is selected",
+                            "type": "boolean"
+                        }
+                    }
+                },
+                {
+                    "name": "create_mindmap",
+                    "description": "Create a new mindmap",
+                    "parameters": {
+                        "central_topic": {
+                            "description": "The central topic text",
+                            "type": "string",
+                            "required": True
+                        },
+                        "topics": {
+                            "description": "List of topics to add",
+                            "type": "array",
+                            "required": False
+                        },
+                        "relationships": {
+                            "description": "List of relationships between topics",
+                            "type": "array",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "add_topic",
+                    "description": "Add a topic to the mindmap",
+                    "parameters": {
+                        "text": {
+                            "description": "The topic text",
+                            "type": "string",
+                            "required": True
+                        },
+                        "parent_guid": {
+                            "description": "GUID of the parent topic",
+                            "type": "string",
+                            "required": False
+                        },
+                        "notes": {
+                            "description": "Notes for the topic",
+                            "type": "string",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "guid": {
+                            "description": "GUID of the created topic",
+                            "type": "string"
+                        },
+                        "text": {
+                            "description": "Text of the created topic",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "update_topic",
+                    "description": "Update an existing topic",
+                    "parameters": {
+                        "guid": {
+                            "description": "GUID of the topic to update",
+                            "type": "string",
+                            "required": True
+                        },
+                        "text": {
+                            "description": "New topic text",
+                            "type": "string",
+                            "required": False
+                        },
+                        "notes": {
+                            "description": "New notes for the topic",
+                            "type": "string",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "add_relationship",
+                    "description": "Add a relationship between topics",
+                    "parameters": {
+                        "guid_1": {
+                            "description": "GUID of the first topic",
+                            "type": "string",
+                            "required": True
+                        },
+                        "guid_2": {
+                            "description": "GUID of the second topic",
+                            "type": "string",
+                            "required": True
+                        },
+                        "label": {
+                            "description": "Label for the relationship",
+                            "type": "string",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "add_tag",
+                    "description": "Add a tag to a topic",
+                    "parameters": {
+                        "topic_guid": {
+                            "description": "GUID of the topic",
+                            "type": "string",
+                            "required": True
+                        },
+                        "tag_text": {
+                            "description": "Tag text",
+                            "type": "string",
+                            "required": True
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                }
+            ]
+        }
+    
+    async def get_capabilities(self) -> Dict[str, Any]:
+        """
+        Get the capabilities of the MCP plugin.
+        
+        Returns:
+            Dict: Capabilities description
+        """
+        return self._capabilities
+    
+    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle an MCP request from Claude Desktop.
+        
+        Args:
+            request: MCP request
+            
+        Returns:
+            Dict: MCP response
+        """
+        try:
+            # Extract action and parameters
+            action = request.get("action", "")
+            params = request.get("params", {})
+            
+            # Special handling for capabilities request
+            if action == "get_capabilities":
+                return {
+                    "success": True,
+                    "data": await self.get_capabilities(),
+                }
+            
+            # Dispatch the request to the appropriate handler
+            if action == "get_mindmap":
+                return await self._handle_get_mindmap(params)
+            elif action == "create_mindmap":
+                return await self._handle_create_mindmap(params)
+            elif action == "add_topic":
+                return await self._handle_add_topic(params)
+            elif action == "update_topic":
+                return await self._handle_update_topic(params)
+            elif action == "add_relationship":
+                return await self._handle_add_relationship(params)
+            elif action == "add_tag":
+                return await self._handle_add_tag(params)
+            else:
+                print(f"Unknown action: {action}", file=sys.stderr)
+                return self._create_error_response(f"Unknown action: {action}")
+        
+        except Exception as e:
+            print(f"Error handling MCP request: {str(e)}", file=sys.stderr)
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_get_mindmap(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle get_mindmap action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            # Get the mindmap from the active document
+            if not self.document.get_mindmap():
+                return self._create_error_response("No mindmap document is open in MindManager")
+            
+            # Convert mindmap to dictionary
+            mindmap_data = self._mindmap_topic_to_dict(self.document.mindmap)
+            
+            return {
+                "success": True,
+                "data": {
+                    "mindmap": mindmap_data,
+                    "max_topic_level": self.document.max_topic_level,
+                    "selected_topics": [
+                        {"text": text, "level": level, "guid": guid}
+                        for text, level, guid in zip(
+                            self.document.selected_topic_texts,
+                            self.document.selected_topic_levels,
+                            self.document.selected_topic_ids,
+                        )
+                    ],
+                    "central_topic_selected": self.document.central_topic_selected,
+                },
+            }
+        
+        except Exception as e:
+            print(f"Error in get_mindmap: {str(e)}", file=sys.stderr)
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_create_mindmap(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle create_mindmap action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            central_topic_text = params.get("central_topic", "Central Topic")
+            topics = params.get("topics", [])
+            relationships = params.get("relationships", [])
+            
+            # Create a new mindmap with the central topic
+            self.document.create_mindmap(central_topic_text)
+            
+            # Add topics
+            for topic_data in topics:
+                text = topic_data.get("text", "")
+                parent_guid = topic_data.get("parent_guid", None)
+                notes = topic_data.get("notes", None)
+                
+                if not parent_guid:
+                    # Add to central topic
+                    central_topic = self.document.mindm.get_central_topic()
+                    new_topic = self.document.mindm.add_subtopic_to_topic(central_topic, text)
+                else:
+                    # Add to specified parent
+                    parent = self.document.mindm.get_topic_by_id(parent_guid)
+                    if not parent:
+                        continue
+                    new_topic = self.document.mindm.add_subtopic_to_topic(parent, text)
+                
+                # Add notes if provided
+                if notes and new_topic:
+                    if self.document.mindm.platform == "win":
+                        new_topic.Notes.Text = notes
+                    elif self.document.mindm.platform == "darwin":
+                        new_topic.notes.set(notes)
+            
+            # Add relationships
+            for rel in relationships:
+                guid_1 = rel.get("guid_1", "")
+                guid_2 = rel.get("guid_2", "")
+                label = rel.get("label", "")
+                
+                if guid_1 and guid_2:
+                    self.document.mindm.add_relationship(guid_1, guid_2, label)
+            
+            return {
+                "success": True,
+                "message": "Mindmap created successfully",
+            }
+        
+        except Exception as e:
+            print(f"Error in create_mindmap: {str(e)}", file=sys.stderr)
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_add_topic(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle add_topic action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            text = params.get("text", "")
+            parent_guid = params.get("parent_guid", None)
+            notes = params.get("notes", None)
+            
+            # Ensure we have the current mindmap
+            if not self.document.mindmap:
+                if not self.document.get_mindmap():
+                    return self._create_error_response("No mindmap document is open in MindManager")
+            
+            # Find the parent topic
+            parent_topic = None
+            
+            if not parent_guid:
+                # Use central topic as parent
+                parent_topic = self.document.mindm.get_central_topic()
+            else:
+                # Find the parent topic by GUID
+                parent_topic = self.document.mindm.get_topic_by_id(parent_guid)
+            
+            if not parent_topic:
+                return self._create_error_response("Parent topic not found")
+            
+            # Add the new topic
+            new_topic = self.document.mindm.add_subtopic_to_topic(parent_topic, text)
+            new_topic_guid = self.document.mindm.get_guid_from_topic(new_topic)
+            
+            # Add notes if provided
+            if notes:
+                if self.document.mindm.platform == "win":
+                    new_topic.Notes.Text = notes
+                elif self.document.mindm.platform == "darwin":
+                    new_topic.notes.set(notes)
+            
+            return {
+                "success": True,
+                "data": {
+                    "guid": new_topic_guid,
+                    "text": text,
+                },
+            }
+        
+        except Exception as e:
+            print(f"Error in add_topic: {str(e)}", file=sys.stderr)
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_update_topic(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle update_topic action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            guid = params.get("guid", "")
+            text = params.get("text", None)
+            notes = params.get("notes", None)
+            
+            if not guid:
+                return self._create_error_response("Topic GUID is required")
+            
+            # Find the topic
+            topic = self.document.mindm.get_topic_by_id(guid)
+            if not topic:
+                return self._create_error_response(f"Topic not found with GUID: {guid}")
+            
+            # Update the text
+            if text is not None:
+                self.document.mindm.set_text_to_topic(topic, text)
+            
+            # Update notes if provided
+            if notes is not None:
+                if self.document.mindm.platform == "win":
+                    topic.Notes.Text = notes if notes else ""
+                elif self.document.mindm.platform == "darwin":
+                    topic.notes.set(notes if notes else "")
+            
+            return {
+                "success": True,
+                "message": "Topic updated successfully",
+            }
+        
+        except Exception as e:
+            print(f"Error in update_topic: {str(e)}", file=sys.stderr)
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_add_relationship(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle add_relationship action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            guid_1 = params.get("guid_1", "")
+            guid_2 = params.get("guid_2", "")
+            label = params.get("label", "")
+            
+            if not guid_1 or not guid_2:
+                return self._create_error_response("Both guid_1 and guid_2 are required")
+            
+            # Add the relationship
+            self.document.mindm.add_relationship(guid_1, guid_2, label)
+            
+            return {
+                "success": True,
+                "message": "Relationship added successfully",
+            }
+        
+        except Exception as e:
+            print(f"Error in add_relationship: {str(e)}", file=sys.stderr)
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_add_tag(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle add_tag action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            topic_guid = params.get("topic_guid", "")
+            tag_text = params.get("tag_text", "")
+            
+            if not topic_guid or not tag_text:
+                return self._create_error_response("Both topic_guid and tag_text are required")
+            
+            # Add the tag
+            self.document.mindm.add_tag_to_topic(topic=None, tag_text=tag_text, topic_guid=topic_guid)
+            
+            return {
+                "success": True,
+                "message": "Tag added successfully",
+            }
+        
+        except Exception as e:
+            print(f"Error in add_tag: {str(e)}", file=sys.stderr)
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    def _create_error_response(self, error_message: str) -> Dict[str, Any]:
+        """
+        Create an error response.
+        
+        Args:
+            error_message: Error message
+            
+        Returns:
+            Dict: Error response
+        """
+        return {
+            "success": False,
+            "error": error_message,
+        }
+    
+    def _mindmap_topic_to_dict(self, topic: MindmapTopic, recursive: bool = True, visited=None) -> Dict[str, Any]:
+        """
+        Convert a MindmapTopic to a dictionary representation.
+        
+        Args:
+            topic: MindmapTopic instance
+            recursive: Whether to include subtopics recursively
+            visited: Set of visited topic GUIDs to prevent recursion loops
+            
+        Returns:
+            Dict: Dictionary representation of the topic
+        """
+        if visited is None:
+            visited = set()
+            
+        if topic.guid in visited:
+            # Return minimal information for already visited topics to avoid cycles
+            return {
+                "guid": topic.guid,
+                "text": topic.text,
+                "level": topic.level,
+                "visited_reference": True,
+            }
+        
+        visited.add(topic.guid)
+        
+        result = {
+            "guid": topic.guid,
+            "text": topic.text,
+            "level": topic.level,
+        }
+        
+        if topic.notes:
+            if topic.notes.text:
+                result["notes"] = topic.notes.text
+            elif topic.notes.xhtml:
+                result["notes"] = topic.notes.xhtml
+        
+        if topic.links and len(topic.links) > 0:
+            result["links"] = [
+                {"text": link.text, "url": link.url, "guid": link.guid} 
+                for link in topic.links
+            ]
+        
+        if topic.tags and len(topic.tags) > 0:
+            result["tags"] = [tag.text for tag in topic.tags]
+        
+        if topic.references and len(topic.references) > 0:
+            result["references"] = [
+                {
+                    "guid_1": ref.guid_1,
+                    "guid_2": ref.guid_2,
+                    "direction": ref.direction,
+                    "label": ref.label,
+                }
+                for ref in topic.references
+            ]
+        
+        if recursive and topic.subtopics and len(topic.subtopics) > 0:
+            result["subtopics"] = [
+                self._mindmap_topic_to_dict(subtopic, recursive, visited.copy())
+                for subtopic in topic.subtopics
+            ]
+        
+        return result
+
+class DirectMCPServer:
+    """Direct MCP Server implementation for Claude Desktop integration."""
+    
+    def __init__(self, plugin: MindManagerDirectPlugin, host: str = "localhost", port: int = 8090):
+        """
+        Initialize the MCP Server.
+        
+        Args:
+            plugin: MindManager MCP Plugin instance
+            host: Host to listen on
+            port: Port to listen on
+        """
+        self.plugin = plugin
+        self.host = host
+        self.port = port
+        self.server = None
+        self.shutdown_event = asyncio.Event()
+        self.clients = set()
+    
+    async def start(self):
+        """Start the MCP Server."""
+        print(f"Starting Direct MCP Server on {self.host}:{self.port}", file=sys.stderr)
+        
+        # Initialize the plugin
+        success = await self.plugin.initialize()
+        if not success:
+            print("Failed to initialize MindManager Direct Plugin", file=sys.stderr)
+            return False
+        
+        # Create the server
+        try:
+            server = await asyncio.start_server(
+                self._handle_connection,
+                self.host,
+                self.port,
+            )
+            
+            self.server = server
+            print(f"Direct MCP Server running on {self.host}:{self.port}", file=sys.stderr)
+            
+            # Serve until shut down
+            try:
+                await self.shutdown_event.wait()
+            finally:
+                print("Shutting down Direct MCP Server", file=sys.stderr)
+                server.close()
+                await server.wait_closed()
+                await self.plugin.cleanup()
+                
+            return True
+            
+        except Exception as e:
+            print(f"Failed to start Direct MCP Server: {str(e)}", file=sys.stderr)
+            return False
+    
+    async def stop(self):
+        """Stop the MCP Server."""
+        print("Stopping Direct MCP Server", file=sys.stderr)
+        
+        # Close all client connections
+        for writer in self.clients:
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception as e:
+                print(f"Error closing client connection: {str(e)}", file=sys.stderr)
+        
+        self.shutdown_event.set()
+    
+    async def _handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        """
+        Handle a client connection.
+        
+        Args:
+            reader: StreamReader for receiving data
+            writer: StreamWriter for sending data
+        """
+        peer = writer.get_extra_info("peername")
+        print(f"Connection from {peer}", file=sys.stderr)
+        self.clients.add(writer)
+        
+        try:
+            while not reader.at_eof():
+                # Read request length (4 bytes, little-endian unsigned int)
+                length_bytes = await reader.readexactly(4)
+                length = int.from_bytes(length_bytes, byteorder="little", signed=False)
+                
+                # Read request JSON
+                request_bytes = await reader.readexactly(length)
+                request_str = request_bytes.decode("utf-8")
+                
+                try:
+                    request = json.loads(request_str)
+                    print(f"Received request: {request}", file=sys.stderr)
+                    
+                    # Process the request
+                    response = await self.plugin.handle_request(request)
+                    
+                    # Send response
+                    response_str = json.dumps(response)
+                    response_bytes = response_str.encode("utf-8")
+                    
+                    # Write response length and data
+                    writer.write(len(response_bytes).to_bytes(4, byteorder="little", signed=False))
+                    writer.write(response_bytes)
+                    await writer.drain()
+                
+                except json.JSONDecodeError as e:
+                    print(f"Invalid JSON: {e}", file=sys.stderr)
+                    await self._send_error_response(writer, f"Invalid JSON: {str(e)}")
+                
+                except Exception as e:
+                    print(f"Error processing request: {e}", file=sys.stderr)
+                    await self._send_error_response(writer, f"Error: {str(e)}")
+        
+        except asyncio.IncompleteReadError:
+            print(f"Client {peer} disconnected", file=sys.stderr)
+        
+        except ConnectionResetError:
+            print(f"Connection reset by {peer}", file=sys.stderr)
+        
+        except Exception as e:
+            print(f"Error handling connection: {e}", file=sys.stderr)
+        
+        finally:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+            
+            self.clients.discard(writer)
+            print(f"Connection from {peer} closed", file=sys.stderr)
+    
+    async def _send_error_response(self, writer: asyncio.StreamWriter, error_message: str):
+        """
+        Send an error response to the client.
+        
+        Args:
+            writer: StreamWriter for sending data
+            error_message: Error message
+        """
+        try:
+            error_response = json.dumps({"success": False, "error": error_message})
+            error_bytes = error_response.encode("utf-8")
+            writer.write(len(error_bytes).to_bytes(4, byteorder="little", signed=False))
+            writer.write(error_bytes)
+            await writer.drain()
+        except Exception as e:
+            print(f"Error sending error response: {str(e)}", file=sys.stderr)
+
+def find_free_port(host="localhost", start_port=8090):
+    """
+    Find a free port to use.
+    
+    Args:
+        host: Host to check
+        start_port: Port to start checking from
+        
+    Returns:
+        int: Free port number
+    """
+    port = start_port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        while port < start_port + 100:
+            try:
+                s.bind((host, port))
+                s.listen(1)
+                s.close()
+                return port
+            except OSError:
+                port += 1
+    raise RuntimeError("Could not find a free port")
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="Direct MindManager MCP Integration for Claude Desktop")
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="localhost",
+        help="Host to bind the MCP server to (default: localhost)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=0,  # 0 means find a free port
+        help="Port to bind the MCP server to (default: auto-detect)",
+    )
+    return parser.parse_args()
+
+async def main():
+    """Main entry point."""
+    args = parse_arguments()
+    
+    # If port is 0, find a free port
+    if args.port == 0:
+        port = find_free_port(args.host, 8090)
+    else:
+        port = args.port
+    
+    # Create the plugin
+    plugin = MindManagerDirectPlugin()
+    
+    # Create and start the server
+    server = DirectMCPServer(plugin, host=args.host, port=port)
+    
+    # Set up signal handlers for graceful shutdown
+    loop = asyncio.get_running_loop()
+    
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, lambda: asyncio.create_task(server.stop()))
+    
+    # Run the server
+    try:
+        print(f"Starting Direct MindManager MCP Integration on {args.host}:{port}", file=sys.stderr)
+        print("Press Ctrl+C to stop the server", file=sys.stderr)
+        
+        server_started = await server.start()
+        
+        if not server_started:
+            print("\n===== INITIALIZATION FAILED =====", file=sys.stderr)
+            print("Could not start the MCP server due to initialization errors.", file=sys.stderr)
+            print("Please check the above messages for details on how to fix this issue.", file=sys.stderr)
+            print("================================\n", file=sys.stderr)
+            
+            # Keep the process alive for a few seconds so Claude Desktop can read the error message
+            print("Waiting for 10 seconds before exiting...", file=sys.stderr)
+            await asyncio.sleep(10)
+            return 1
+    
+    except Exception as e:
+        print(f"Error running Direct MCP server: {e}", file=sys.stderr)
+        
+        # Keep the process alive for a few seconds so Claude Desktop can read the error message
+        print("Waiting for 10 seconds before exiting...", file=sys.stderr)
+        await asyncio.sleep(10)
+        return 1
+    
+    return 0
+
+def run_direct_integration():
+    """
+    Entry point for the console script.
+    This function is called when running mindm-direct-integration from the command line.
+    """
+    try:
+        return asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Integration stopped by user", file=sys.stderr)
+        return 0
+    except Exception as e:
+        print(f"Error running integration: {e}", file=sys.stderr)
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(run_direct_integration())
+
+
+================================================
+File: mindm_mcp/main.py
+================================================
+# mindm_mcp/main.py
+"""
+Main entry point for the MindManager MCP Server.
+"""
+
+import asyncio
+import os
+import sys
+import logging
+import argparse
+import uvicorn
+
+from mindm_mcp.server import app, cleanup_inactive_sessions
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("mindm-mcp")
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="MindManager MCP Server")
+    parser.add_argument(
+        "--host", 
+        type=str, 
+        default="127.0.0.1", 
+        help="Host to bind the server to"
+    )
+    parser.add_argument(
+        "--port", 
+        type=int, 
+        default=8000, 
+        help="Port to bind the server to"
+    )
+    parser.add_argument(
+        "--reload", 
+        action="store_true", 
+        help="Enable auto-reload for development"
+    )
+    return parser.parse_args()
+
+def start_server():
+    """Start the FastAPI server."""
+    args = parse_arguments()
+    
+    # Set up the cleanup task
+    @app.on_event("startup")
+    async def startup_event():
+        asyncio.create_task(cleanup_inactive_sessions())
+    
+    # Start the server
+    logger.info(f"Starting MindManager MCP Server on {args.host}:{args.port}")
+    uvicorn.run(
+        "mindm_mcp.server:app",
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
+    )
+
+if __name__ == "__main__":
+    start_server()
+
+
+
+================================================
+File: mindm_mcp/mcp_plugin.py
+================================================
+# mindm_mcp/mcp_plugin.py
+"""
+Model Context Protocol (MCP) Plugin for MindManager.
+
+This module implements an MCP plugin that allows Claude Desktop and other
+AI assistants to interact with MindManager through the mindm library.
+"""
+
+import os
+import json
+import logging
+import asyncio
+import socket
+import struct
+import sys
+from typing import Dict, List, Any, Optional, Callable, Awaitable, Union, Tuple
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("mindm-mcp-plugin")
+
+# Use absolute import
+try:
+    from mindm_mcp.client import MindManagerClient
+except ImportError:
+    # For development/testing in the current directory
+    from client import MindManagerClient
+
+class MindManagerMCPPlugin:
+    """Model Context Protocol plugin for MindManager."""
+    
+    def __init__(self, base_url: str = "http://127.0.0.1:8000"):
+        """
+        Initialize the MindManager MCP Plugin.
+        
+        Args:
+            base_url: URL of the MindManager MCP Server
+        """
+        self.base_url = base_url
+        self.client = MindManagerClient(base_url)
+        self.session_id = None
+        self._capabilities = self._build_capabilities()
+    
+    async def initialize(self) -> bool:
+        """
+        Initialize the plugin.
+        
+        Returns:
+            bool: True if initialization was successful, False otherwise
+        """
+        print("Initializing MindManager MCP plugin", file=sys.stderr)
+        try:
+            # Create a session
+            self.session_id = await self.client.create_session()
+            print(f"Created MindManager session: {self.session_id}", file=sys.stderr)
+            return True
+        except Exception as e:
+            print(f"Failed to initialize MindManager MCP plugin: {str(e)}", file=sys.stderr)
+            return False
+    
+    async def cleanup(self) -> None:
+        """Clean up resources before shutdown."""
+        logger.info("Cleaning up MindManager MCP plugin")
+        if self.session_id:
+            try:
+                await self.client.delete_session(self.session_id)
+                logger.info(f"Deleted MindManager session: {self.session_id}")
+            except Exception as e:
+                logger.error(f"Error deleting session: {str(e)}")
+        
+        try:
+            await self.client.close()
+        except Exception as e:
+            logger.error(f"Error closing client: {str(e)}")
+    
+    def _build_capabilities(self) -> Dict[str, Any]:
+        """
+        Build the capabilities description for the MCP plugin.
+        
+        Returns:
+            Dict: Capabilities description
+        """
+        return {
+            "name": "mindmanager",
+            "display_name": "MindManager",
+            "description": "Interact with MindManager to create and modify mind maps",
+            "version": "0.1.0",
+            "actions": [
+                {
+                    "name": "get_mindmap",
+                    "description": "Get the current mindmap from MindManager",
+                    "parameters": {},
+                    "returns": {
+                        "mindmap": {
+                            "description": "The current mindmap structure",
+                            "type": "object"
+                        },
+                        "max_topic_level": {
+                            "description": "The maximum topic level in the mindmap",
+                            "type": "integer"
+                        },
+                        "selected_topics": {
+                            "description": "List of currently selected topics",
+                            "type": "array"
+                        },
+                        "central_topic_selected": {
+                            "description": "Whether the central topic is selected",
+                            "type": "boolean"
+                        }
+                    }
+                },
+                {
+                    "name": "create_mindmap",
+                    "description": "Create a new mindmap",
+                    "parameters": {
+                        "central_topic": {
+                            "description": "The central topic text",
+                            "type": "string",
+                            "required": True
+                        },
+                        "topics": {
+                            "description": "List of topics to add",
+                            "type": "array",
+                            "required": False
+                        },
+                        "relationships": {
+                            "description": "List of relationships between topics",
+                            "type": "array",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "add_topic",
+                    "description": "Add a topic to the mindmap",
+                    "parameters": {
+                        "text": {
+                            "description": "The topic text",
+                            "type": "string",
+                            "required": True
+                        },
+                        "parent_guid": {
+                            "description": "GUID of the parent topic",
+                            "type": "string",
+                            "required": False
+                        },
+                        "notes": {
+                            "description": "Notes for the topic",
+                            "type": "string",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "guid": {
+                            "description": "GUID of the created topic",
+                            "type": "string"
+                        },
+                        "text": {
+                            "description": "Text of the created topic",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "update_topic",
+                    "description": "Update an existing topic",
+                    "parameters": {
+                        "guid": {
+                            "description": "GUID of the topic to update",
+                            "type": "string",
+                            "required": True
+                        },
+                        "text": {
+                            "description": "New topic text",
+                            "type": "string",
+                            "required": False
+                        },
+                        "notes": {
+                            "description": "New notes for the topic",
+                            "type": "string",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "add_relationship",
+                    "description": "Add a relationship between topics",
+                    "parameters": {
+                        "guid_1": {
+                            "description": "GUID of the first topic",
+                            "type": "string",
+                            "required": True
+                        },
+                        "guid_2": {
+                            "description": "GUID of the second topic",
+                            "type": "string",
+                            "required": True
+                        },
+                        "label": {
+                            "description": "Label for the relationship",
+                            "type": "string",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "add_tag",
+                    "description": "Add a tag to a topic",
+                    "parameters": {
+                        "topic_guid": {
+                            "description": "GUID of the topic",
+                            "type": "string",
+                            "required": True
+                        },
+                        "tag_text": {
+                            "description": "Tag text",
+                            "type": "string",
+                            "required": True
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "serialize_mindmap",
+                    "description": "Serialize the mindmap to a specified format",
+                    "parameters": {
+                        "format_type": {
+                            "description": "Format to serialize to (mermaid, markdown, json)",
+                            "type": "string",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "format": {
+                            "description": "The format of the serialized mindmap",
+                            "type": "string"
+                        },
+                        "content": {
+                            "description": "The serialized mindmap content",
+                            "type": "string"
+                        }
+                    }
+                }
+            ]
+        }
+    
+    async def get_capabilities(self) -> Dict[str, Any]:
+        """
+        Get the capabilities of the MCP plugin.
+        
+        Returns:
+            Dict: Capabilities description
+        """
+        return self._capabilities
+    
+    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle an MCP request from Claude Desktop.
+        
+        Args:
+            request: MCP request
+            
+        Returns:
+            Dict: MCP response
+        """
+        try:
+            # Extract action and parameters
+            action = request.get("action", "")
+            params = request.get("params", {})
+            
+            # Special handling for capabilities request
+            if action == "get_capabilities":
+                return {
+                    "success": True,
+                    "data": await self.get_capabilities(),
+                }
+            
+            # For multiple parameters ensure the session_id is set
+            if isinstance(params, dict):
+                params["session_id"] = self.session_id
+            
+            # Dispatch the request to the appropriate handler
+            if action == "get_mindmap":
+                return await self._handle_get_mindmap(params)
+            elif action == "create_mindmap":
+                return await self._handle_create_mindmap(params)
+            elif action == "add_topic":
+                return await self._handle_add_topic(params)
+            elif action == "update_topic":
+                return await self._handle_update_topic(params)
+            elif action == "add_relationship":
+                return await self._handle_add_relationship(params)
+            elif action == "add_tag":
+                return await self._handle_add_tag(params)
+            elif action == "serialize_mindmap":
+                return await self._handle_serialize_mindmap(params)
+            else:
+                logger.warning(f"Unknown action: {action}")
+                return self._create_error_response(f"Unknown action: {action}")
+        
+        except Exception as e:
+            logger.error(f"Error handling MCP request: {str(e)}")
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_get_mindmap(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle get_mindmap action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            result = await self.client.get_mindmap()
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "data": result["data"],
+                }
+            else:
+                return self._create_error_response(result.get("error", "Unknown error"))
+        
+        except Exception as e:
+            logger.error(f"Error in get_mindmap: {str(e)}")
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_create_mindmap(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle create_mindmap action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            central_topic = params.get("central_topic", "Central Topic")
+            topics = params.get("topics", [])
+            relationships = params.get("relationships", [])
+            
+            result = await self.client.create_mindmap(
+                central_topic=central_topic,
+                topics=topics,
+                relationships=relationships,
+            )
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "message": "Mindmap created successfully",
+                }
+            else:
+                return self._create_error_response(result.get("error", "Unknown error"))
+        
+        except Exception as e:
+            logger.error(f"Error in create_mindmap: {str(e)}")
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_add_topic(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle add_topic action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            text = params.get("text", "")
+            parent_guid = params.get("parent_guid", None)
+            notes = params.get("notes", None)
+            
+            result = await self.client.add_topic(
+                text=text,
+                parent_guid=parent_guid,
+                notes=notes,
+            )
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "data": result.get("data", {}),
+                }
+            else:
+                return self._create_error_response(result.get("error", "Unknown error"))
+        
+        except Exception as e:
+            logger.error(f"Error in add_topic: {str(e)}")
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_update_topic(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle update_topic action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            guid = params.get("guid", "")
+            text = params.get("text", None)
+            notes = params.get("notes", None)
+            
+            if not guid:
+                return self._create_error_response("Topic GUID is required")
+            
+            result = await self.client.update_topic(
+                guid=guid,
+                text=text,
+                notes=notes,
+            )
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "message": "Topic updated successfully",
+                }
+            else:
+                return self._create_error_response(result.get("error", "Unknown error"))
+        
+        except Exception as e:
+            logger.error(f"Error in update_topic: {str(e)}")
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_add_relationship(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle add_relationship action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            guid_1 = params.get("guid_1", "")
+            guid_2 = params.get("guid_2", "")
+            label = params.get("label", "")
+            
+            if not guid_1 or not guid_2:
+                return self._create_error_response("Both guid_1 and guid_2 are required")
+            
+            result = await self.client.add_relationship(
+                guid_1=guid_1,
+                guid_2=guid_2,
+                label=label,
+            )
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "message": "Relationship added successfully",
+                }
+            else:
+                return self._create_error_response(result.get("error", "Unknown error"))
+        
+        except Exception as e:
+            logger.error(f"Error in add_relationship: {str(e)}")
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_add_tag(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle add_tag action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            topic_guid = params.get("topic_guid", "")
+            tag_text = params.get("tag_text", "")
+            
+            if not topic_guid or not tag_text:
+                return self._create_error_response("Both topic_guid and tag_text are required")
+            
+            result = await self.client.add_tag(
+                topic_guid=topic_guid,
+                tag_text=tag_text,
+            )
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "message": "Tag added successfully",
+                }
+            else:
+                return self._create_error_response(result.get("error", "Unknown error"))
+        
+        except Exception as e:
+            logger.error(f"Error in add_tag: {str(e)}")
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    async def _handle_serialize_mindmap(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle serialize_mindmap action.
+        
+        Args:
+            params: Action parameters
+            
+        Returns:
+            Dict: Action response
+        """
+        try:
+            format_type = params.get("format_type", "mermaid")
+            
+            result = await self.client.serialize_mindmap(
+                format_type=format_type,
+            )
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "data": result.get("data", {}),
+                }
+            else:
+                return self._create_error_response(result.get("error", "Unknown error"))
+        
+        except Exception as e:
+            logger.error(f"Error in serialize_mindmap: {str(e)}")
+            return self._create_error_response(f"Error: {str(e)}")
+    
+    def _create_error_response(self, error_message: str) -> Dict[str, Any]:
+        """
+        Create an error response.
+        
+        Args:
+            error_message: Error message
+            
+        Returns:
+            Dict: Error response
+        """
+        return {
+            "success": False,
+            "error": error_message,
+        }
+
+class MCPServer:
+    """MCP Server implementation for Claude Desktop integration."""
+    
+    def __init__(self, plugin: MindManagerMCPPlugin, host: str = "localhost", port: int = 8090):
+        """
+        Initialize the MCP Server.
+        
+        Args:
+            plugin: MindManager MCP Plugin instance
+            host: Host to listen on
+            port: Port to listen on
+        """
+        self.plugin = plugin
+        self.host = host
+        self.port = port
+        self.server = None
+        self.shutdown_event = asyncio.Event()
+        self.clients = set()
+    
+    async def start(self):
+        """Start the MCP Server."""
+        logger.info(f"Starting MCP Server on {self.host}:{self.port}")
+        
+        # Initialize the plugin
+        success = await self.plugin.initialize()
+        if not success:
+            logger.error("Failed to initialize MindManager MCP plugin")
+            return False
+        
+        # Create the server
+        try:
+            server = await asyncio.start_server(
+                self._handle_connection,
+                self.host,
+                self.port,
+            )
+            
+            self.server = server
+            logger.info(f"MCP Server running on {self.host}:{self.port}")
+            
+            # Serve until shut down
+            try:
+                await self.shutdown_event.wait()
+            finally:
+                logger.info("Shutting down MCP Server")
+                server.close()
+                await server.wait_closed()
+                await self.plugin.cleanup()
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to start MCP Server: {str(e)}")
+            return False
+    
+    async def stop(self):
+        """Stop the MCP Server."""
+        logger.info("Stopping MCP Server")
+        
+        # Close all client connections
+        for writer in self.clients:
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception as e:
+                logger.error(f"Error closing client connection: {str(e)}")
+        
+        self.shutdown_event.set()
+    
+    async def _handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        """
+        Handle a client connection.
+        
+        Args:
+            reader: StreamReader for receiving data
+            writer: StreamWriter for sending data
+        """
+        peer = writer.get_extra_info("peername")
+        logger.info(f"Connection from {peer}")
+        self.clients.add(writer)
+        
+        try:
+            while not reader.at_eof():
+                # Read request length (4 bytes, little-endian unsigned int)
+                length_bytes = await reader.readexactly(4)
+                length = int.from_bytes(length_bytes, byteorder="little", signed=False)
+                
+                # Read request JSON
+                request_bytes = await reader.readexactly(length)
+                request_str = request_bytes.decode("utf-8")
+                
+                try:
+                    request = json.loads(request_str)
+                    logger.debug(f"Received request: {request}")
+                    
+                    # Process the request
+                    response = await self.plugin.handle_request(request)
+                    
+                    # Send response
+                    response_str = json.dumps(response)
+                    response_bytes = response_str.encode("utf-8")
+                    
+                    # Write response length and data
+                    writer.write(len(response_bytes).to_bytes(4, byteorder="little", signed=False))
+                    writer.write(response_bytes)
+                    await writer.drain()
+                
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON: {e}")
+                    await self._send_error_response(writer, f"Invalid JSON: {str(e)}")
+                
+                except Exception as e:
+                    logger.error(f"Error processing request: {e}")
+                    await self._send_error_response(writer, f"Error: {str(e)}")
+        
+        except asyncio.IncompleteReadError:
+            logger.info(f"Client {peer} disconnected")
+        
+        except ConnectionResetError:
+            logger.info(f"Connection reset by {peer}")
+        
+        except Exception as e:
+            logger.error(f"Error handling connection: {e}")
+        
+        finally:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+            
+            self.clients.discard(writer)
+            logger.info(f"Connection from {peer} closed")
+    
+    async def _send_error_response(self, writer: asyncio.StreamWriter, error_message: str):
+        """
+        Send an error response to the client.
+        
+        Args:
+            writer: StreamWriter for sending data
+            error_message: Error message
+        """
+        try:
+            error_response = json.dumps({"success": False, "error": error_message})
+            error_bytes = error_response.encode("utf-8")
+            writer.write(len(error_bytes).to_bytes(4, byteorder="little", signed=False))
+            writer.write(error_bytes)
+            await writer.drain()
+        except Exception as e:
+            logger.error(f"Error sending error response: {str(e)}")
+
+
+
+================================================
+File: mindm_mcp/mindm_direct.py
+================================================
+#!/usr/bin/env python3
+"""
+Direct MindManager MCP Integration for Claude Desktop.
+
+This script directly interacts with MindManager without intermediate servers,
+providing a streamlined MCP interface for Claude Desktop.
+"""
+
+import os
+import sys
+import json
+import logging
+import socket
+import struct
+import asyncio
+import argparse
+import signal
+from typing import Dict, List, Any, Optional
+
+try:
+    import mindm.mindmanager as mm
+    from mindmap.mindmap import MindmapDocument, MindmapTopic, MindmapNotes, MindmapTag
+except ImportError:
+    print("Error: mindm package not found. Installing it now...", file=sys.stderr)
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "mindm"])
+    import mindm.mindmanager as mm
+    from mindmap.mindmap import MindmapDocument, MindmapTopic, MindmapNotes, MindmapTag
+
+# Configure logging to go to stderr only
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stderr
+)
+logger = logging.getLogger("mindm-direct")
+
+class SimpleMMInterface:
+    """Simple interface for MindManager operations."""
+    
+    def __init__(self):
+        """Initialize the MindManager interface."""
+        self.document = None
+        self.initialized = False
+    
+    def initialize(self):
+        """Initialize connection to MindManager."""
+        try:
+            # Direct connection to MindManager
+            self.document = MindmapDocument(charttype="auto", turbo_mode=False)
+            self.initialized = True
+            print("Successfully connected to MindManager.", file=sys.stderr)
+            return True
+        except Exception as e:
+            print(f"Error connecting to MindManager: {e}", file=sys.stderr)
+            return False
+    
+    def get_mindmap(self):
+        """Get the current mindmap from MindManager."""
+        if not self.initialized:
+            if not self.initialize():
+                return {"success": False, "error": "Failed to initialize MindManager connection"}
+        
+        try:
+            success = self.document.get_mindmap()
+            if not success:
+                return {"success": False, "error": "No mindmap document is open in MindManager"}
+            
+            mindmap_data = self.mindmap_to_dict(self.document.mindmap)
+            
+            return {
+                "success": True,
+                "data": {
+                    "mindmap": mindmap_data,
+                    "max_topic_level": self.document.max_topic_level,
+                    "selected_topics": [
+                        {"text": text, "level": level, "guid": guid}
+                        for text, level, guid in zip(
+                            self.document.selected_topic_texts,
+                            self.document.selected_topic_levels,
+                            self.document.selected_topic_ids,
+                        )
+                    ],
+                    "central_topic_selected": self.document.central_topic_selected,
+                }
+            }
+        except Exception as e:
+            print(f"Error getting mindmap: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
+    
+    def create_mindmap(self, central_topic, topics=None, relationships=None):
+        """Create a new mindmap."""
+        if not self.initialized:
+            if not self.initialize():
+                return {"success": False, "error": "Failed to initialize MindManager connection"}
+        
+        try:
+            topics = topics or []
+            relationships = relationships or []
+            
+            # Create mindmap with central topic
+            self.document.create_mindmap(central_topic)
+            
+            # Add topics
+            for topic_data in topics:
+                text = topic_data.get("text", "")
+                parent_guid = topic_data.get("parent_guid", None)
+                notes = topic_data.get("notes", None)
+                
+                if not parent_guid:
+                    # Add to central topic
+                    central_topic = self.document.mindm.get_central_topic()
+                    new_topic = self.document.mindm.add_subtopic_to_topic(central_topic, text)
+                else:
+                    # Add to specified parent
+                    parent = self.document.mindm.get_topic_by_id(parent_guid)
+                    if not parent:
+                        continue
+                    new_topic = self.document.mindm.add_subtopic_to_topic(parent, text)
+                
+                # Add notes if provided
+                if notes and new_topic:
+                    if self.document.mindm.platform == "win":
+                        new_topic.Notes.Text = notes
+                    elif self.document.mindm.platform == "darwin":
+                        new_topic.notes.set(notes)
+            
+            # Add relationships
+            for rel in relationships:
+                guid_1 = rel.get("guid_1", "")
+                guid_2 = rel.get("guid_2", "")
+                label = rel.get("label", "")
+                
+                if guid_1 and guid_2:
+                    self.document.mindm.add_relationship(guid_1, guid_2, label)
+            
+            return {"success": True, "message": "Mindmap created successfully"}
+        except Exception as e:
+            print(f"Error creating mindmap: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
+    
+    def add_topic(self, text, parent_guid=None, notes=None):
+        """Add a topic to the mindmap."""
+        if not self.initialized:
+            if not self.initialize():
+                return {"success": False, "error": "Failed to initialize MindManager connection"}
+        
+        try:
+            # Ensure we have the current mindmap
+            if not self.document.mindmap:
+                if not self.document.get_mindmap():
+                    return {"success": False, "error": "No mindmap document is open in MindManager"}
+            
+            # Find the parent topic
+            if not parent_guid:
+                parent_topic = self.document.mindm.get_central_topic()
+            else:
+                parent_topic = self.document.mindm.get_topic_by_id(parent_guid)
+                
+            if not parent_topic:
+                return {"success": False, "error": "Parent topic not found"}
+            
+            # Add the topic
+            new_topic = self.document.mindm.add_subtopic_to_topic(parent_topic, text)
+            new_topic_guid = self.document.mindm.get_guid_from_topic(new_topic)
+            
+            # Add notes if provided
+            if notes:
+                if self.document.mindm.platform == "win":
+                    new_topic.Notes.Text = notes
+                elif self.document.mindm.platform == "darwin":
+                    new_topic.notes.set(notes)
+            
+            return {
+                "success": True,
+                "data": {
+                    "guid": new_topic_guid,
+                    "text": text
+                }
+            }
+        except Exception as e:
+            print(f"Error adding topic: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
+    
+    def update_topic(self, guid, text=None, notes=None):
+        """Update a topic in the mindmap."""
+        if not self.initialized:
+            if not self.initialize():
+                return {"success": False, "error": "Failed to initialize MindManager connection"}
+        
+        try:
+            if not guid:
+                return {"success": False, "error": "Topic GUID is required"}
+                
+            # Find the topic
+            topic = self.document.mindm.get_topic_by_id(guid)
+            if not topic:
+                return {"success": False, "error": f"Topic not found with GUID: {guid}"}
+            
+            # Update text if provided
+            if text is not None:
+                self.document.mindm.set_text_to_topic(topic, text)
+            
+            # Update notes if provided
+            if notes is not None:
+                if self.document.mindm.platform == "win":
+                    topic.Notes.Text = notes if notes else ""
+                elif self.document.mindm.platform == "darwin":
+                    topic.notes.set(notes if notes else "")
+            
+            return {"success": True, "message": "Topic updated successfully"}
+        except Exception as e:
+            print(f"Error updating topic: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
+    
+    def add_relationship(self, guid_1, guid_2, label=""):
+        """Add a relationship between topics."""
+        if not self.initialized:
+            if not self.initialize():
+                return {"success": False, "error": "Failed to initialize MindManager connection"}
+        
+        try:
+            if not guid_1 or not guid_2:
+                return {"success": False, "error": "Both guid_1 and guid_2 are required"}
+            
+            # Add the relationship
+            self.document.mindm.add_relationship(guid_1, guid_2, label)
+            
+            return {"success": True, "message": "Relationship added successfully"}
+        except Exception as e:
+            print(f"Error adding relationship: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
+    
+    def add_tag(self, topic_guid, tag_text):
+        """Add a tag to a topic."""
+        if not self.initialized:
+            if not self.initialize():
+                return {"success": False, "error": "Failed to initialize MindManager connection"}
+        
+        try:
+            if not topic_guid or not tag_text:
+                return {"success": False, "error": "Both topic_guid and tag_text are required"}
+            
+            # Add the tag
+            self.document.mindm.add_tag_to_topic(topic=None, tag_text=tag_text, topic_guid=topic_guid)
+            
+            return {"success": True, "message": "Tag added successfully"}
+        except Exception as e:
+            print(f"Error adding tag: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
+    
+    def get_capabilities(self):
+        """Get the capabilities of the MindManager integration."""
+        return {
+            "name": "mindmanager",
+            "display_name": "MindManager",
+            "description": "Interact with MindManager to create and modify mind maps",
+            "version": "0.1.0",
+            "actions": [
+                {
+                    "name": "get_mindmap",
+                    "description": "Get the current mindmap from MindManager",
+                    "parameters": {},
+                    "returns": {
+                        "mindmap": {
+                            "description": "The current mindmap structure",
+                            "type": "object"
+                        },
+                        "max_topic_level": {
+                            "description": "The maximum topic level in the mindmap",
+                            "type": "integer"
+                        },
+                        "selected_topics": {
+                            "description": "List of currently selected topics",
+                            "type": "array"
+                        },
+                        "central_topic_selected": {
+                            "description": "Whether the central topic is selected",
+                            "type": "boolean"
+                        }
+                    }
+                },
+                {
+                    "name": "create_mindmap",
+                    "description": "Create a new mindmap",
+                    "parameters": {
+                        "central_topic": {
+                            "description": "The central topic text",
+                            "type": "string",
+                            "required": True
+                        },
+                        "topics": {
+                            "description": "List of topics to add",
+                            "type": "array",
+                            "required": False
+                        },
+                        "relationships": {
+                            "description": "List of relationships between topics",
+                            "type": "array",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "add_topic",
+                    "description": "Add a topic to the mindmap",
+                    "parameters": {
+                        "text": {
+                            "description": "The topic text",
+                            "type": "string",
+                            "required": True
+                        },
+                        "parent_guid": {
+                            "description": "GUID of the parent topic",
+                            "type": "string",
+                            "required": False
+                        },
+                        "notes": {
+                            "description": "Notes for the topic",
+                            "type": "string",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "guid": {
+                            "description": "GUID of the created topic",
+                            "type": "string"
+                        },
+                        "text": {
+                            "description": "Text of the created topic",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "update_topic",
+                    "description": "Update an existing topic",
+                    "parameters": {
+                        "guid": {
+                            "description": "GUID of the topic to update",
+                            "type": "string",
+                            "required": True
+                        },
+                        "text": {
+                            "description": "New topic text",
+                            "type": "string",
+                            "required": False
+                        },
+                        "notes": {
+                            "description": "New notes for the topic",
+                            "type": "string",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "add_relationship",
+                    "description": "Add a relationship between topics",
+                    "parameters": {
+                        "guid_1": {
+                            "description": "GUID of the first topic",
+                            "type": "string",
+                            "required": True
+                        },
+                        "guid_2": {
+                            "description": "GUID of the second topic",
+                            "type": "string",
+                            "required": True
+                        },
+                        "label": {
+                            "description": "Label for the relationship",
+                            "type": "string",
+                            "required": False
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                },
+                {
+                    "name": "add_tag",
+                    "description": "Add a tag to a topic",
+                    "parameters": {
+                        "topic_guid": {
+                            "description": "GUID of the topic",
+                            "type": "string",
+                            "required": True
+                        },
+                        "tag_text": {
+                            "description": "Tag text",
+                            "type": "string",
+                            "required": True
+                        }
+                    },
+                    "returns": {
+                        "message": {
+                            "description": "Status message",
+                            "type": "string"
+                        }
+                    }
+                }
+            ]
+        }
+    
+    def handle_request(self, request):
+        """Handle an MCP request."""
+        try:
+            action = request.get("action", "")
+            params = request.get("params", {})
+            
+            # Special handling for capabilities request
+            if action == "get_capabilities":
+                return {"success": True, "data": self.get_capabilities()}
+            
+            # Dispatch to appropriate handler
+            if action == "get_mindmap":
+                return self.get_mindmap()
+            elif action == "create_mindmap":
+                central_topic = params.get("central_topic", "Central Topic")
+                topics = params.get("topics", [])
+                relationships = params.get("relationships", [])
+                return self.create_mindmap(central_topic, topics, relationships)
+            elif action == "add_topic":
+                text = params.get("text", "")
+                parent_guid = params.get("parent_guid")
+                notes = params.get("notes")
+                return self.add_topic(text, parent_guid, notes)
+            elif action == "update_topic":
+                guid = params.get("guid", "")
+                text = params.get("text")
+                notes = params.get("notes")
+                return self.update_topic(guid, text, notes)
+            elif action == "add_relationship":
+                guid_1 = params.get("guid_1", "")
+                guid_2 = params.get("guid_2", "")
+                label = params.get("label", "")
+                return self.add_relationship(guid_1, guid_2, label)
+            elif action == "add_tag":
+                topic_guid = params.get("topic_guid", "")
+                tag_text = params.get("tag_text", "")
+                return self.add_tag(topic_guid, tag_text)
+            else:
+                return {"success": False, "error": f"Unknown action: {action}"}
+        except Exception as e:
+            print(f"Error handling request: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
+    
+    def mindmap_to_dict(self, topic, recursive=True, visited=None):
+        """Convert a MindmapTopic to a dictionary representation."""
+        if visited is None:
+            visited = set()
+            
+        if topic.guid in visited:
+            # Return minimal information for already visited topics to avoid cycles
+            return {
+                "guid": topic.guid,
+                "text": topic.text,
+                "level": topic.level,
+                "visited_reference": True,
+            }
+        
+        visited.add(topic.guid)
+        
+        result = {
+            "guid": topic.guid,
+            "text": topic.text,
+            "level": topic.level,
+        }
+        
+        if topic.notes:
+            if topic.notes.text:
+                result["notes"] = topic.notes.text
+            elif topic.notes.xhtml:
+                result["notes"] = topic.notes.xhtml
+        
+        if topic.links and len(topic.links) > 0:
+            result["links"] = [
+                {"text": link.text, "url": link.url, "guid": link.guid} 
+                for link in topic.links
+            ]
+        
+        if topic.tags and len(topic.tags) > 0:
+            result["tags"] = [tag.text for tag in topic.tags]
+        
+        if topic.references and len(topic.references) > 0:
+            result["references"] = [
+                {
+                    "guid_1": ref.guid_1,
+                    "guid_2": ref.guid_2,
+                    "direction": ref.direction,
+                    "label": ref.label,
+                }
+                for ref in topic.references
+            ]
+        
+        if recursive and topic.subtopics and len(topic.subtopics) > 0:
+            result["subtopics"] = [
+                self.mindmap_to_dict(subtopic, recursive, visited.copy())
+                for subtopic in topic.subtopics
+            ]
+        
+        return result
+
+class DirectMCPServer:
+    """Simplified MCP Server for Claude Desktop integration."""
+    
+    def __init__(self, interface, host="localhost", port=8090):
+        """Initialize the server."""
+        self.interface = interface
+        self.host = host
+        self.port = port
+        self.server = None
+        self.shutdown_event = asyncio.Event()
+        self.clients = set()
+    
+    async def start(self):
+        """Start the MCP server."""
+        print(f"Starting MindManager MCP server on {self.host}:{self.port}", file=sys.stderr)
+        
+        # Initialize the direct connection to MindManager
+        if not self.interface.initialize():
+            print("Failed to initialize MindManager interface.", file=sys.stderr)
+            return False
+        
+        # Create the server
+        try:
+            server = await asyncio.start_server(
+                self._handle_connection,
+                self.host,
+                self.port,
+            )
+            
+            self.server = server
+            print(f"MindManager MCP server running on {self.host}:{self.port}", file=sys.stderr)
+            
+            # Serve until shut down
+            try:
+                await self.shutdown_event.wait()
+            finally:
+                print("Shutting down MindManager MCP server", file=sys.stderr)
+                server.close()
+                await server.wait_closed()
+                
+            return True
+            
+        except Exception as e:
+            print(f"Failed to start MindManager MCP server: {str(e)}", file=sys.stderr)
+            return False
+    
+    async def stop(self):
+        """Stop the MCP server."""
+        print("Stopping MindManager MCP server", file=sys.stderr)
+        
+        # Close all client connections
+        for writer in self.clients:
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception as e:
+                print(f"Error closing client connection: {str(e)}", file=sys.stderr)
+        
+        self.shutdown_event.set()
+    
+    async def _handle_connection(self, reader, writer):
+        """Handle a client connection."""
+        peer = writer.get_extra_info("peername")
+        print(f"Connection from {peer}", file=sys.stderr)
+        self.clients.add(writer)
+        
+        try:
+            while not reader.at_eof():
+                # Read request length (4 bytes, little-endian unsigned int)
+                length_bytes = await reader.readexactly(4)
+                length = int.from_bytes(length_bytes, byteorder="little", signed=False)
+                
+                # Read request JSON
+                request_bytes = await reader.readexactly(length)
+                request_str = request_bytes.decode("utf-8")
+                
+                try:
+                    request = json.loads(request_str)
+                    print(f"Received request: {request}", file=sys.stderr)
+                    
+                    # Process the request directly with the interface
+                    response = self.interface.handle_request(request)
+                    
+                    # Send response
+                    response_str = json.dumps(response)
+                    response_bytes = response_str.encode("utf-8")
+                    
+                    # Write response length and data
+                    writer.write(len(response_bytes).to_bytes(4, byteorder="little", signed=False))
+                    writer.write(response_bytes)
+                    await writer.drain()
+                
+                except json.JSONDecodeError as e:
+                    print(f"Invalid JSON: {e}", file=sys.stderr)
+                    await self._send_error_response(writer, f"Invalid JSON: {str(e)}")
+                
+                except Exception as e:
+                    print(f"Error processing request: {e}", file=sys.stderr)
+                    await self._send_error_response(writer, f"Error: {str(e)}")
+        
+        except asyncio.IncompleteReadError:
+            print(f"Client {peer} disconnected", file=sys.stderr)
+        
+        except ConnectionResetError:
+            print(f"Connection reset by {peer}", file=sys.stderr)
+        
+        except Exception as e:
+            print(f"Error handling connection: {e}", file=sys.stderr)
+        
+        finally:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+            
+            self.clients.discard(writer)
+            print(f"Connection from {peer} closed", file=sys.stderr)
+    
+    async def _send_error_response(self, writer, error_message):
+        """Send an error response to the client."""
+        try:
+            error_response = json.dumps({"success": False, "error": error_message})
+            error_bytes = error_response.encode("utf-8")
+            writer.write(len(error_bytes).to_bytes(4, byteorder="little", signed=False))
+            writer.write(error_bytes)
+            await writer.drain()
+        except Exception as e:
+            print(f"Error sending error response: {str(e)}", file=sys.stderr)
+
+def find_free_port(host="localhost", start_port=8090):
+    """Find a free port to use."""
+    port = start_port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        while port < start_port + 100:
+            try:
+                s.bind((host, port))
+                s.listen(1)
+                s.close()
+                return port
+            except OSError:
+                port += 1
+    raise RuntimeError("Could not find a free port")
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="Direct MindManager MCP Integration for Claude Desktop")
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="localhost",
+        help="Host to bind the MCP server to (default: localhost)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=0,  # 0 means find a free port
+        help="Port to bind the MCP server to (default: auto-detect)",
+    )
+    return parser.parse_args()
+
+async def main():
+    """Main entry point."""
+    args = parse_arguments()
+    
+    # If port is 0, find a free port
+    if args.port == 0:
+        port = find_free_port(args.host, 8090)
+    else:
+        port = args.port
+    
+    # Create the MindManager interface
+    interface = SimpleMMInterface()
+    
+    # Create and start the server
+    server = DirectMCPServer(interface, host=args.host, port=port)
+    
+    # Set up signal handlers for graceful shutdown
+    loop = asyncio.get_running_loop()
+    
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, lambda: asyncio.create_task(server.stop()))
+    
+    # Run the server
+    try:
+        print(f"Starting Direct MindManager MCP Integration on {args.host}:{port}", file=sys.stderr)
+        print("Press Ctrl+C to stop the server", file=sys.stderr)
+        
+        success = await server.start()
+        
+        if not success:
+            print("Failed to start MCP server due to initialization errors.", file=sys.stderr)
+            # Keep the process alive for a few seconds so Claude Desktop can read the error
+            await asyncio.sleep(10)
+            return 1
+    
+    except Exception as e:
+        print(f"Error running MCP server: {e}", file=sys.stderr)
+        await asyncio.sleep(10)
+        return 1
+    
+    return 0
+
+def run_direct():
+    """Entry point for the console script."""
+    try:
+        return asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Integration stopped by user", file=sys.stderr)
+        return 0
+    except Exception as e:
+        print(f"Error running integration: {e}", file=sys.stderr)
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(run_direct())
+
+
+================================================
+File: mindm_mcp/server.py
+================================================
+# mindm_mcp/server.py
+"""
+MindManager MCP Server
+
+This module implements a Model Context Protocol (MCP) server for the mindm library,
+enabling AI assistants like Claude to interact with MindManager.
+"""
+
+import asyncio
+import json
+import logging
+import os
+import uuid
+from typing import Dict, List, Optional, Any, Union
+
+import uvicorn
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+import mindm.mindmanager as mm
+from mindmap.mindmap import MindmapDocument, MindmapTopic, MindmapNotes, MindmapLink, MindmapReference, MindmapTag
+import mindmap.serialization as mms
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("mindm-mcp")
+
+# Create FastAPI app
+app = FastAPI(
+    title="MindManager MCP Server",
+    description="Model Context Protocol server for integrating MindManager with AI assistants",
+    version="0.1.0",
+)
+
+# Add CORS middleware to allow connections from Claude Desktop
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, restrict this to specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Store active sessions
+active_sessions: Dict[str, Dict[str, Any]] = {}
+
+# ----- Pydantic Models -----
+
+class SessionConfig(BaseModel):
+    """Configuration for creating a new MindManager session."""
+    charttype: str = Field(default="auto", description="Chart type (auto, radial, orgchart)")
+    turbo_mode: bool = Field(default=False, description="Enable turbo mode for faster processing")
+    
+class SessionInfo(BaseModel):
+    """Information about an active MindManager session."""
+    session_id: str
+    charttype: str
+    turbo_mode: bool
+    document_exists: bool
+
+class TopicData(BaseModel):
+    """Data structure for a mind map topic."""
+    text: str
+    guid: Optional[str] = None
+    notes: Optional[str] = None
+    parent_guid: Optional[str] = None
+    
+class MindmapData(BaseModel):
+    """Data structure for a complete mindmap."""
+    central_topic: str
+    topics: List[TopicData] = []
+    relationships: List[Dict[str, Any]] = []
+
+class MCPRequest(BaseModel):
+    """Generic MCP request structure."""
+    action: str
+    params: Dict[str, Any] = {}
+    
+class MCPResponse(BaseModel):
+    """Generic MCP response structure."""
+    success: bool
+    data: Optional[Any] = None
+    error: Optional[str] = None
+
+# ----- Helper Functions -----
+
+def create_session(charttype: str = "auto", turbo_mode: bool = False) -> str:
+    """
+    Create a new MindManager session.
+    
+    Args:
+        charttype: Chart type (auto, radial, orgchart)
+        turbo_mode: Enable turbo mode for faster processing
+        
+    Returns:
+        str: Session ID
+    """
+    session_id = str(uuid.uuid4())
+    
+    try:
+        # Create MindmapDocument instance
+        document = MindmapDocument(charttype=charttype, turbo_mode=turbo_mode)
+        
+        # Store session information
+        active_sessions[session_id] = {
+            "document": document,
+            "charttype": charttype,
+            "turbo_mode": turbo_mode,
+            "last_accessed": asyncio.get_event_loop().time(),
+        }
+        
+        logger.info(f"Created new session: {session_id}")
+        return session_id
+    
+    except Exception as e:
+        logger.error(f"Failed to create session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")
+
+def get_session(session_id: str) -> Dict[str, Any]:
+    """
+    Get an active session by ID.
+    
+    Args:
+        session_id: Session ID
+        
+    Returns:
+        Dict: Session information
+    """
+    if session_id not in active_sessions:
+        logger.error(f"Session not found: {session_id}")
+        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
+    
+    # Update last accessed time
+    active_sessions[session_id]["last_accessed"] = asyncio.get_event_loop().time()
+    return active_sessions[session_id]
+
+def mindmap_topic_to_dict(topic: MindmapTopic, recursive: bool = True, visited=None) -> Dict[str, Any]:
+    """
+    Convert a MindmapTopic to a dictionary representation.
+    
+    Args:
+        topic: MindmapTopic instance
+        recursive: Whether to include subtopics recursively
+        visited: Set of visited topic GUIDs to prevent recursion loops
+        
+    Returns:
+        Dict: Dictionary representation of the topic
+    """
+    if visited is None:
+        visited = set()
+        
+    if topic.guid in visited:
+        # Return minimal information for already visited topics to avoid cycles
+        return {
+            "guid": topic.guid,
+            "text": topic.text,
+            "level": topic.level,
+            "visited_reference": True,
+        }
+    
+    visited.add(topic.guid)
+    
+    result = {
+        "guid": topic.guid,
+        "text": topic.text,
+        "level": topic.level,
+    }
+    
+    if topic.notes:
+        if topic.notes.text:
+            result["notes"] = topic.notes.text
+        elif topic.notes.xhtml:
+            result["notes"] = topic.notes.xhtml
+    
+    if topic.links and len(topic.links) > 0:
+        result["links"] = [
+            {"text": link.text, "url": link.url, "guid": link.guid} 
+            for link in topic.links
+        ]
+    
+    if topic.tags and len(topic.tags) > 0:
+        result["tags"] = [tag.text for tag in topic.tags]
+    
+    if topic.references and len(topic.references) > 0:
+        result["references"] = [
+            {
+                "guid_1": ref.guid_1,
+                "guid_2": ref.guid_2,
+                "direction": ref.direction,
+                "label": ref.label,
+            }
+            for ref in topic.references
+        ]
+    
+    if recursive and topic.subtopics and len(topic.subtopics) > 0:
+        result["subtopics"] = [
+            mindmap_topic_to_dict(subtopic, recursive, visited.copy())
+            for subtopic in topic.subtopics
+        ]
+    
+    return result
+
+# ----- API Routes -----
+
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {"status": "ok", "service": "MindManager MCP Server"}
+
+@app.post("/sessions", response_model=SessionInfo)
+async def create_new_session(config: SessionConfig):
+    """
+    Create a new MindManager session.
+    
+    Args:
+        config: Session configuration
+        
+    Returns:
+        SessionInfo: Information about the created session
+    """
+    session_id = create_session(config.charttype, config.turbo_mode)
+    session = get_session(session_id)
+    
+    return SessionInfo(
+        session_id=session_id,
+        charttype=session["charttype"],
+        turbo_mode=session["turbo_mode"],
+        document_exists=session["document"].mindm.document_exists(),
+    )
+
+@app.get("/sessions/{session_id}", response_model=SessionInfo)
+async def get_session_info(session_id: str):
+    """
+    Get information about an active session.
+    
+    Args:
+        session_id: Session ID
+        
+    Returns:
+        SessionInfo: Session information
+    """
+    session = get_session(session_id)
+    
+    return SessionInfo(
+        session_id=session_id,
+        charttype=session["charttype"],
+        turbo_mode=session["turbo_mode"],
+        document_exists=session["document"].mindm.document_exists(),
+    )
+
+@app.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """
+    Delete an active session.
+    
+    Args:
+        session_id: Session ID
+        
+    Returns:
+        Dict: Status information
+    """
+    if session_id not in active_sessions:
+        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
+    
+    try:
+        # Clean up resources
+        session = active_sessions[session_id]
+        del active_sessions[session_id]
+        logger.info(f"Deleted session: {session_id}")
+        return {"success": True, "message": f"Session {session_id} deleted"}
+    
+    except Exception as e:
+        logger.error(f"Failed to delete session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(e)}")
+
+@app.post("/sessions/{session_id}/get_mindmap")
+async def get_mindmap(session_id: str):
+    """
+    Get the current mindmap from MindManager.
+    
+    Args:
+        session_id: Session ID
+        
+    Returns:
+        Dict: Mindmap data
+    """
+    session = get_session(session_id)
+    document = session["document"]
+    
+    try:
+        # Get the mindmap from the active document
+        if not document.get_mindmap():
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": "No mindmap document is open in MindManager"},
+            )
+        
+        # Convert mindmap to dictionary
+        mindmap_data = mindmap_topic_to_dict(document.mindmap)
+        
+        return {
+            "success": True,
+            "data": {
+                "mindmap": mindmap_data,
+                "max_topic_level": document.max_topic_level,
+                "selected_topics": [
+                    {"text": text, "level": level, "guid": guid}
+                    for text, level, guid in zip(
+                        document.selected_topic_texts,
+                        document.selected_topic_levels,
+                        document.selected_topic_ids,
+                    )
+                ],
+                "central_topic_selected": document.central_topic_selected,
+            },
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to get mindmap: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Failed to get mindmap: {str(e)}"},
+        )
+
+@app.post("/sessions/{session_id}/create_mindmap")
+async def create_mindmap(session_id: str, data: MindmapData):
+    """
+    Create a new mindmap in MindManager.
+    
+    Args:
+        session_id: Session ID
+        data: Mindmap data
+        
+    Returns:
+        Dict: Status information
+    """
+    session = get_session(session_id)
+    document = session["document"]
+    
+    try:
+        # Create a new mindmap structure
+        central_topic = MindmapTopic(
+            guid=str(uuid.uuid4()),
+            text=data.central_topic,
+            level=0,
+        )
+        
+        # Add topics from the data
+        topic_map = {central_topic.guid: central_topic}
+        
+        # First pass: create all topics
+        for topic_data in data.topics:
+            topic = MindmapTopic(
+                guid=topic_data.guid or str(uuid.uuid4()),
+                text=topic_data.text,
+                level=1 if topic_data.parent_guid is None else 2,
+            )
+            
+            if topic_data.notes:
+                topic.notes = MindmapNotes(text=topic_data.notes)
+            
+            topic_map[topic.guid] = topic
+        
+        # Second pass: build topic hierarchy
+        for topic_data in data.topics:
+            topic = topic_map[topic_data.guid or ""]
+            parent_guid = topic_data.parent_guid
+            
+            if parent_guid is None or parent_guid == "":
+                # Connect to central topic
+                topic.parent = central_topic
+                central_topic.subtopics.append(topic)
+            elif parent_guid in topic_map:
+                # Connect to parent topic
+                parent = topic_map[parent_guid]
+                topic.parent = parent
+                parent.subtopics.append(topic)
+        
+        # Add relationships
+        for rel_data in data.relationships:
+            if "guid_1" in rel_data and "guid_2" in rel_data:
+                guid_1 = rel_data["guid_1"]
+                guid_2 = rel_data["guid_2"]
+                label = rel_data.get("label", "")
+                direction = rel_data.get("direction", 1)
+                
+                if guid_1 in topic_map and guid_2 in topic_map:
+                    topic = topic_map[guid_1]
+                    ref = MindmapReference(
+                        guid_1=guid_1,
+                        guid_2=guid_2,
+                        direction=direction,
+                        label=label,
+                    )
+                    topic.references.append(ref)
+        
+        # Set the mindmap in the document
+        document.mindmap = central_topic
+        
+        # Create the mindmap in MindManager
+        document.create_mindmap()
+        
+        return {"success": True, "message": "Mindmap created successfully"}
+    
+    except Exception as e:
+        logger.error(f"Failed to create mindmap: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Failed to create mindmap: {str(e)}"},
+        )
+
+@app.post("/sessions/{session_id}/add_topic")
+async def add_topic(session_id: str, topic_data: TopicData):
+    """
+    Add a topic to the mindmap.
+    
+    Args:
+        session_id: Session ID
+        topic_data: Topic data
+        
+    Returns:
+        Dict: Status information with the created topic's GUID
+    """
+    session = get_session(session_id)
+    document = session["document"]
+    
+    try:
+        # Ensure we have the current mindmap
+        if not document.mindmap:
+            if not document.get_mindmap():
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": "No mindmap document is open in MindManager"},
+                )
+        
+        # Find the parent topic
+        parent_guid = topic_data.parent_guid
+        parent_topic = None
+        
+        if parent_guid is None or parent_guid == "":
+            # Use central topic as parent
+            parent_topic = document.mindm.get_central_topic()
+        else:
+            # Find the parent topic by GUID
+            parent_topic = document.mindm.get_topic_by_id(parent_guid)
+        
+        if not parent_topic:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": "Parent topic not found"},
+            )
+        
+        # Add the new topic
+        new_topic = document.mindm.add_subtopic_to_topic(parent_topic, topic_data.text)
+        new_topic_guid = document.mindm.get_guid_from_topic(new_topic)
+        
+        # Add notes if provided
+        if topic_data.notes:
+            notes = MindmapNotes(text=topic_data.notes)
+            if notes.text:
+                new_topic.Notes.Text = notes.text
+        
+        return {
+            "success": True,
+            "data": {
+                "guid": new_topic_guid,
+                "text": topic_data.text,
+            },
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to add topic: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Failed to add topic: {str(e)}"},
+        )
+
+@app.post("/sessions/{session_id}/update_topic")
+async def update_topic(session_id: str, topic_data: TopicData):
+    """
+    Update an existing topic in the mindmap.
+    
+    Args:
+        session_id: Session ID
+        topic_data: Topic data with updated information
+        
+    Returns:
+        Dict: Status information
+    """
+    session = get_session(session_id)
+    document = session["document"]
+    
+    try:
+        # Ensure we have a GUID
+        if not topic_data.guid:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": "Topic GUID is required for updates"},
+            )
+        
+        # Find the topic
+        topic = document.mindm.get_topic_by_id(topic_data.guid)
+        if not topic:
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "error": f"Topic not found with GUID: {topic_data.guid}"},
+            )
+        
+        # Update the text
+        if topic_data.text:
+            document.mindm.set_text_to_topic(topic, topic_data.text)
+        
+        # Update notes if provided
+        if topic_data.notes is not None:
+            if document.mindm.platform == "win":
+                # Windows implementation
+                if topic_data.notes:
+                    topic.Notes.Text = topic_data.notes
+                else:
+                    # Clear notes
+                    topic.Notes.Text = ""
+            elif document.mindm.platform == "darwin":
+                # macOS implementation
+                if topic_data.notes:
+                    topic.notes.set(topic_data.notes)
+                else:
+                    # Clear notes
+                    topic.notes.set("")
+        
+        return {"success": True, "message": "Topic updated successfully"}
+    
+    except Exception as e:
+        logger.error(f"Failed to update topic: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Failed to update topic: {str(e)}"},
+        )
+
+@app.post("/sessions/{session_id}/add_relationship")
+async def add_relationship(
+    session_id: str,
+    relationship: Dict[str, str],
+):
+    """
+    Add a relationship between two topics.
+    
+    Args:
+        session_id: Session ID
+        relationship: Dictionary with guid_1, guid_2, and optional label
+        
+    Returns:
+        Dict: Status information
+    """
+    session = get_session(session_id)
+    document = session["document"]
+    
+    try:
+        # Validate input
+        if "guid_1" not in relationship or "guid_2" not in relationship:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": "Both guid_1 and guid_2 are required"},
+            )
+        
+        guid_1 = relationship["guid_1"]
+        guid_2 = relationship["guid_2"]
+        label = relationship.get("label", "")
+        
+        # Add the relationship
+        document.mindm.add_relationship(guid_1, guid_2, label)
+        
+        return {"success": True, "message": "Relationship added successfully"}
+    
+    except Exception as e:
+        logger.error(f"Failed to add relationship: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Failed to add relationship: {str(e)}"},
+        )
+
+@app.post("/sessions/{session_id}/add_tag")
+async def add_tag(
+    session_id: str,
+    data: Dict[str, str],
+):
+    """
+    Add a tag to a topic.
+    
+    Args:
+        session_id: Session ID
+        data: Dictionary with topic_guid and tag_text
+        
+    Returns:
+        Dict: Status information
+    """
+    session = get_session(session_id)
+    document = session["document"]
+    
+    try:
+        # Validate input
+        if "topic_guid" not in data or "tag_text" not in data:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": "Both topic_guid and tag_text are required"},
+            )
+        
+        topic_guid = data["topic_guid"]
+        tag_text = data["tag_text"]
+        
+        # Add the tag
+        document.mindm.add_tag_to_topic(topic=None, tag_text=tag_text, topic_guid=topic_guid)
+        
+        return {"success": True, "message": "Tag added successfully"}
+    
+    except Exception as e:
+        logger.error(f"Failed to add tag: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Failed to add tag: {str(e)}"},
+        )
+
+@app.post("/sessions/{session_id}/serialize_mindmap")
+async def serialize_mindmap(session_id: str, format_type: str = "mermaid"):
+    """
+    Serialize the current mindmap to a specified format.
+    
+    Args:
+        session_id: Session ID
+        format_type: Format to serialize to (mermaid, markdown, json)
+        
+    Returns:
+        Dict: Serialized mindmap data
+    """
+    session = get_session(session_id)
+    document = session["document"]
+    
+    try:
+        # Ensure we have the current mindmap
+        if not document.mindmap:
+            if not document.get_mindmap():
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": "No mindmap document is open in MindManager"},
+                )
+        
+        # Serialize based on format type
+        if format_type == "mermaid":
+            # Build GUID mapping
+            guid_mapping = {}
+            mms.build_mapping(document.mindmap, guid_mapping)
+            
+            # Serialize to Mermaid format
+            serialized = mms.serialize_mindmap(document.mindmap, guid_mapping, id_only=False)
+            return {"success": True, "data": {"format": "mermaid", "content": serialized}}
+        
+        elif format_type == "markdown":
+            # Serialize to Markdown format
+            serialized = mms.serialize_mindmap_markdown(document.mindmap, include_notes=True)
+            return {"success": True, "data": {"format": "markdown", "content": serialized}}
+        
+        elif format_type == "json":
+            # Serialize to JSON format
+            serialized = mindmap_topic_to_dict(document.mindmap)
+            return {"success": True, "data": {"format": "json", "content": serialized}}
+        
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": f"Unsupported format type: {format_type}"},
+            )
+    
+    except Exception as e:
+        logger.error(f"Failed to serialize mindmap: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Failed to serialize mindmap: {str(e)}"},
+        )
+
+# ----- WebSocket for MCP protocol -----
+
+class ConnectionManager:
+    """Manager for WebSocket connections."""
+    
+    def __init__(self):
+        self.active_connections: Dict[str, WebSocket] = {}
+    
+    async def connect(self, websocket: WebSocket, client_id: str):
+        """Connect a new client."""
+        await websocket.accept()
+        self.active_connections[client_id] = websocket
+        logger.info(f"WebSocket client connected: {client_id}")
+    
+    def disconnect(self, client_id: str):
+        """Disconnect a client."""
+        if client_id in self.active_connections:
+            del self.active_connections[client_id]
+            logger.info(f"WebSocket client disconnected: {client_id}")
+    
+    async def send_message(self, client_id: str, message: str):
+        """Send a message to a specific client."""
+        if client_id in self.active_connections:
+            await self.active_connections[client_id].send_text(message)
+    
+    async def broadcast(self, message: str):
+        """Broadcast a message to all connected clients."""
+        for connection in self.active_connections.values():
+            await connection.send_text(message)
+
+# Initialize connection manager
+manager = ConnectionManager()
+
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    """
+    WebSocket endpoint for real-time communication.
+    
+    Args:
+        websocket: WebSocket connection
+        client_id: Client identifier
+    """
+    await manager.connect(websocket, client_id)
+    
+    try:
+        while True:
+            # Receive message
+            data = await websocket.receive_text()
+            
+            try:
+                # Parse request
+                request = json.loads(data)
+                action = request.get("action", "")
+                params = request.get("params", {})
+                
+                # Process based on action
+                if action == "create_session":
+                    charttype = params.get("charttype", "auto")
+                    turbo_mode = params.get("turbo_mode", False)
+                    session_id = create_session(charttype, turbo_mode)
+                    
+                    await websocket.send_json({
+                        "success": True,
+                        "action": "create_session",
+                        "data": {
+                            "session_id": session_id,
+                            "charttype": charttype,
+                            "turbo_mode": turbo_mode,
+                        },
+                    })
+                
+                elif action == "get_mindmap":
+                    session_id = params.get("session_id")
+                    if not session_id:
+                        await websocket.send_json({
+                            "success": False,
+                            "action": "get_mindmap",
+                            "error": "session_id is required",
+                        })
+                        continue
+                    
+                    session = get_session(session_id)
+                    document = session["document"]
+                    
+                    # Get the mindmap
+                    if not document.get_mindmap():
+                        await websocket.send_json({
+                            "success": False,
+                            "action": "get_mindmap",
+                            "error": "No mindmap document is open in MindManager",
+                        })
+                        continue
+                    
+                    # Convert mindmap to dictionary
+                    mindmap_data = mindmap_topic_to_dict(document.mindmap)
+                    
+                    await websocket.send_json({
+                        "success": True,
+                        "action": "get_mindmap",
+                        "data": {
+                            "mindmap": mindmap_data,
+                            "max_topic_level": document.max_topic_level,
+                            "selected_topics": [
+                                {"text": text, "level": level, "guid": guid}
+                                for text, level, guid in zip(
+                                    document.selected_topic_texts,
+                                    document.selected_topic_levels,
+                                    document.selected_topic_ids,
+                                )
+                            ],
+                            "central_topic_selected": document.central_topic_selected,
+                        },
+                    })
+                
+                elif action == "add_topic":
+                    session_id = params.get("session_id")
+                    text = params.get("text", "")
+                    parent_guid = params.get("parent_guid", "")
+                    notes = params.get("notes", "")
+                    
+                    if not session_id:
+                        await websocket.send_json({
+                            "success": False,
+                            "action": "add_topic",
+                            "error": "session_id is required",
+                        })
+                        continue
+                    
+                    session = get_session(session_id)
+                    document = session["document"]
+                    
+                    # Find the parent topic
+                    parent_topic = None
+                    if not parent_guid:
+                        parent_topic = document.mindm.get_central_topic()
+                    else:
+                        parent_topic = document.mindm.get_topic_by_id(parent_guid)
+                    
+                    if not parent_topic:
+                        await websocket.send_json({
+                            "success": False,
+                            "action": "add_topic",
+                            "error": "Parent topic not found",
+                        })
+                        continue
+                    
+                    # Add the topic
+                    new_topic = document.mindm.add_subtopic_to_topic(parent_topic, text)
+                    new_topic_guid = document.mindm.get_guid_from_topic(new_topic)
+                    
+                    # Add notes if provided
+                    if notes:
+                        if document.mindm.platform == "win":
+                            new_topic.Notes.Text = notes
+                        elif document.mindm.platform == "darwin":
+                            new_topic.notes.set(notes)
+                    
+                    await websocket.send_json({
+                        "success": True,
+                        "action": "add_topic",
+                        "data": {
+                            "guid": new_topic_guid,
+                            "text": text,
+                        },
+                    })
+                
+                else:
+                    await websocket.send_json({
+                        "success": False,
+                        "action": action,
+                        "error": f"Unknown action: {action}",
+                    })
+            
+            except json.JSONDecodeError:
+                await websocket.send_json({
+                    "success": False,
+                    "error": "Invalid JSON format",
+                })
+            
+            except Exception as e:
+                logger.error(f"Error processing WebSocket request: {str(e)}")
+                await websocket.send_json({
+                    "success": False,
+                    "error": f"Error processing request: {str(e)}",
+                })
+    
+    except WebSocketDisconnect:
+        manager.disconnect(client_id)
+    
+    except Exception as e:
+        logger.error(f"WebSocket error: {str(e)}")
+        manager.disconnect(client_id)
+
+# ----- Session Maintenance -----
+
+async def cleanup_inactive_sessions():
+    """
+    Periodically clean up inactive sessions to free resources.
+    
+    This task runs every 5 minutes and removes sessions that have been
+    inactive for more than 30 minutes.
+    """
+    while True:
+        try:
+            current_time = asyncio.get_event_loop().time()
+            session_ids_to_remove = []
+            
+            for session_id, session in active_sessions.items():
+                # Check if session has been inactive for more than 30 minutes
+                if current_time - session["last_accessed"] > 1800:  # 30 minutes in seconds
+                    session_ids_to_remove.append(session_id)
+            
+            # Remove inactive sessions
+            for session_id in session_ids_to_remove:
+                logger.info(f"Removing inactive session: {session_id}")
+                del active_sessions[session_id]
+            
+            # Wait for 5 minutes before checking again
+            await asyncio.sleep(300)
+        
+        except Exception as e:
+            logger.error(f"Error in cleanup task: {str(e)}")
+            await asyncio.sleep(300)  # Continue the loop even if there's an error
+
+
+================================================
+File: mindm_mcp/examples/basic_client_example.py
+================================================
+# mindm_mcp/examples/basic_client_example.py
+"""
+Basic example of using the MindManager MCP client library.
+
+This example demonstrates how to:
+1. Create a session
+2. Get the current mindmap
+3. Create a new mindmap
+4. Add topics
+5. Add relationships
+6. Serialize the mindmap
+
+Prerequisites:
+- MindManager must be installed
+- The MindManager MCP server must be running
+"""
+
+import asyncio
+import logging
+from mindm_mcp.client import MindManagerClientContext
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("mindm-basic-example")
+
+async def main():
+    """Main entry point."""
+    async with MindManagerClientContext() as client:
+        # Create a session
+        logger.info("Creating session...")
+        session_id = await client.create_session()
+        logger.info(f"Created session: {session_id}")
+        
+        # Check if a document is open
+        session_info = await client.get_session_info()
+        if not session_info["document_exists"]:
+            logger.info("No document is open in MindManager. Creating a new mindmap...")
+            
+            # Create a new mindmap
+            await client.create_mindmap(
+                central_topic="MindManager MCP Example",
+                topics=[
+                    {
+                        "text": "REST API",
+                        "notes": "RESTful API for interacting with MindManager.",
+                        "guid": "topic1",
+                    },
+                    {
+                        "text": "Client Library",
+                        "notes": "Python client library for the MCP server.",
+                        "guid": "topic2",
+                    },
+                    {
+                        "text": "MCP Integration",
+                        "notes": "Model Context Protocol integration for Claude Desktop.",
+                        "guid": "topic3",
+                    },
+                    {
+                        "text": "Async Support",
+                        "notes": "Asynchronous API for non-blocking operations.",
+                        "guid": "topic4",
+                        "parent_guid": "topic2",
+                    },
+                    {
+                        "text": "Sync Support",
+                        "notes": "Synchronous API for simpler usage.",
+                        "guid": "topic5",
+                        "parent_guid": "topic2",
+                    },
+                ],
+                relationships=[
+                    {
+                        "guid_1": "topic1",
+                        "guid_2": "topic2",
+                        "label": "Used by",
+                    },
+                    {
+                        "guid_1": "topic2",
+                        "guid_2": "topic3",
+                        "label": "Enables",
+                    },
+                ],
+            )
+            logger.info("Created new mindmap")
+        
+        # Get the mindmap
+        logger.info("Getting mindmap...")
+        result = await client.get_mindmap()
+        
+        if result["success"]:
+            mindmap = result["data"]["mindmap"]
+            logger.info(f"Central topic: {mindmap['text']}")
+            logger.info(f"Maximum topic level: {result['data']['max_topic_level']}")
+            
+            # Add a topic
+            logger.info("Adding a new topic...")
+            topic_result = await client.add_topic(
+                text="Added Programmatically",
+                parent_guid=mindmap["guid"],
+                notes="This topic was added through the MCP client library.",
+            )
+            
+            if topic_result["success"]:
+                new_topic_guid = topic_result["data"]["guid"]
+                logger.info(f"Added topic with GUID: {new_topic_guid}")
+                
+                # Add a tag
+                logger.info("Adding a tag to the new topic...")
+                await client.add_tag(
+                    topic_guid=new_topic_guid,
+                    tag_text="Automated",
+                )
+                
+                # Add a subtopic
+                logger.info("Adding a subtopic...")
+                subtopic_result = await client.add_topic(
+                    text="Subtopic",
+                    parent_guid=new_topic_guid,
+                    notes="This is a subtopic of the programmatically added topic.",
+                )
+                
+                if subtopic_result["success"]:
+                    subtopic_guid = subtopic_result["data"]["guid"]
+                    logger.info(f"Added subtopic with GUID: {subtopic_guid}")
+                    
+                    # Add a relationship
+                    logger.info("Adding a relationship...")
+                    await client.add_relationship(
+                        guid_1=new_topic_guid,
+                        guid_2=subtopic_guid,
+                        label="Parent-Child",
+                    )
+            
+            # Serialize the mindmap
+            logger.info("Serializing mindmap to Mermaid format...")
+            serialized_result = await client.serialize_mindmap(format_type="mermaid")
+            
+            if serialized_result["success"]:
+                mermaid = serialized_result["data"]["content"]
+                logger.info("Mermaid diagram:")
+                logger.info(mermaid[:200] + "..." if len(mermaid) > 200 else mermaid)
+            
+            # Serialize to Markdown
+            logger.info("Serializing mindmap to Markdown format...")
+            md_result = await client.serialize_mindmap(format_type="markdown")
+            
+            if md_result["success"]:
+                markdown = md_result["data"]["content"]
+                logger.info("Markdown content:")
+                logger.info(markdown[:200] + "..." if len(markdown) > 200 else markdown)
+        
+        logger.info("Example completed successfully")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
+
+================================================
+File: mindm_mcp/examples/claude_mcp_example.py
+================================================
+# mindm_mcp/examples/claude_mcp_example.py
+"""
+Example of using the MindManager MCP plugin with Claude Desktop.
+
+This example demonstrates how to use the Model Context Protocol to communicate
+with the MindManager MCP plugin, similar to how Claude Desktop would interact with it.
+
+Prerequisites:
+- MindManager must be installed
+- The MindManager MCP server must be running
+- The MindManager MCP plugin must be running
+"""
+
+import json
+import asyncio
+import socket
+import logging
+import struct
+from typing import Dict, Any
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("claude-mcp-example")
+
+async def send_mcp_request(host: str, port: int, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Send a request to the MCP server using the MCP protocol.
+    
+    Args:
+        host: MCP server host
+        port: MCP server port
+        action: Action to perform
+        params: Action parameters
+        
+    Returns:
+        Dict: Response from the MCP server
+    """
+    try:
+        # Connect to the MCP server
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((host, port))
+        
+        # Create request
+        request = {
+            "action": action,
+            "params": params,
+        }
+        request_json = json.dumps(request)
+        request_bytes = request_json.encode("utf-8")
+        
+        # Send request length (4 bytes, little-endian unsigned int)
+        length_bytes = len(request_bytes).to_bytes(4, byteorder="little", signed=False)
+        sock.sendall(length_bytes)
+        
+        # Send request data
+        sock.sendall(request_bytes)
+        
+        # Receive response length
+        length_bytes = sock.recv(4)
+        if not length_bytes:
+            raise RuntimeError("Connection closed unexpectedly")
+        
+        length = int.from_bytes(length_bytes, byteorder="little", signed=False)
+        
+        # Receive response data
+        response_bytes = b""
+        remaining = length
+        while remaining > 0:
+            chunk = sock.recv(min(4096, remaining))
+            if not chunk:
+                raise RuntimeError("Connection closed unexpectedly")
+            response_bytes += chunk
+            remaining -= len(chunk)
+        
+        response_json = response_bytes.decode("utf-8")
+        response = json.loads(response_json)
+        
+        # Close connection
+        sock.close()
+        
+        return response
+    
+    except Exception as e:
+        logger.error(f"Error sending MCP request: {str(e)}")
+        return {"success": False, "error": f"Error: {str(e)}"}
+
+async def main():
+    """Main entry point."""
+    host = "localhost"
+    port = 8090
+    
+    logger.info(f"Connecting to MindManager MCP plugin at {host}:{port}")
+    
+    try:
+        # Get the current mindmap
+        logger.info("Getting the current mindmap...")
+        result = await send_mcp_request(host, port, "get_mindmap", {})
+        
+        if not result["success"]:
+            logger.error(f"Failed to get mindmap: {result.get('error', 'Unknown error')}")
+            return
+        
+        mindmap = result["data"]["mindmap"]
+        logger.info(f"Central topic: {mindmap['text']}")
+        
+        # Create or update the mindmap with Claude-related content
+        if "Claude" not in mindmap["text"]:
+            logger.info("Creating a new Claude-focused mindmap...")
+            
+            # Create a new mindmap
+            create_result = await send_mcp_request(
+                host,
+                port,
+                "create_mindmap",
+                {
+                    "central_topic": "Claude AI Integration",
+                    "topics": [
+                        {
+                            "text": "Model Context Protocol",
+                            "notes": "The Model Context Protocol (MCP) enables AI assistants to interact with external tools.",
+                            "guid": "mcp_topic",
+                        },
+                        {
+                            "text": "MindManager Integration",
+                            "notes": "Integration between Claude and MindManager for mind mapping capabilities.",
+                            "guid": "integration_topic",
+                        },
+                        {
+                            "text": "Use Cases",
+                            "notes": "Potential applications for Claude and MindManager integration.",
+                            "guid": "usecases_topic",
+                        },
+                    ],
+                },
+            )
+            
+            if not create_result["success"]:
+                logger.error(f"Failed to create mindmap: {create_result.get('error', 'Unknown error')}")
+                return
+            
+            logger.info("Created new mindmap with Claude integration theme")
+            
+            # Get the updated mindmap
+            result = await send_mcp_request(host, port, "get_mindmap", {})
+            if not result["success"]:
+                logger.error(f"Failed to get updated mindmap: {result.get('error', 'Unknown error')}")
+                return
+            
+            mindmap = result["data"]["mindmap"]
+        
+        # Add use case topics
+        logger.info("Adding use case topics...")
+        
+        # Find the use cases topic
+        usecases_guid = None
+        if "subtopics" in mindmap:
+            for topic in mindmap["subtopics"]:
+                if topic["text"] == "Use Cases":
+                    usecases_guid = topic["guid"]
+                    break
+        
+        if not usecases_guid:
+            # Add the Use Cases topic if it doesn't exist
+            usecase_result = await send_mcp_request(
+                host,
+                port,
+                "add_topic",
+                {
+                    "text": "Use Cases",
+                    "notes": "Potential applications for Claude and MindManager integration.",
+                },
+            )
+            
+            if not usecase_result["success"]:
+                logger.error(f"Failed to add Use Cases topic: {usecase_result.get('error', 'Unknown error')}")
+                return
+            
+            usecases_guid = usecase_result["data"]["guid"]
+            logger.info(f"Added Use Cases topic with GUID: {usecases_guid}")
+        
+        # Add specific use case topics
+        use_cases = [
+            {
+                "text": "Brainstorming Sessions",
+                "notes": "Claude can help generate ideas and organize them into mind maps for brainstorming sessions.",
+            },
+            {
+                "text": "Project Planning",
+                "notes": "Use Claude to analyze project requirements and create structured project plans in MindManager.",
+            },
+            {
+                "text": "Knowledge Organization",
+                "notes": "Leverage Claude's knowledge to organize complex information into intuitive mind maps.",
+            },
+            {
+                "text": "Learning and Education",
+                "notes": "Create educational mind maps to help with learning and retention of complex topics.",
+            },
+        ]
+        
+        added_topics = []
+        for use_case in use_cases:
+            topic_result = await send_mcp_request(
+                host,
+                port,
+                "add_topic",
+                {
+                    "text": use_case["text"],
+                    "notes": use_case["notes"],
+                    "parent_guid": usecases_guid,
+                },
+            )
+            
+            if topic_result["success"]:
+                logger.info(f"Added use case topic: {use_case['text']}")
+                added_topics.append(topic_result["data"]["guid"])
+            else:
+                logger.error(f"Failed to add use case topic: {topic_result.get('error', 'Unknown error')}")
+        
+        # Add tags to the topics
+        for topic_guid in added_topics:
+            await send_mcp_request(
+                host,
+                port,
+                "add_tag",
+                {
+                    "topic_guid": topic_guid,
+                    "tag_text": "Claude-Enabled",
+                },
+            )
+            logger.info(f"Added 'Claude-Enabled' tag to topic {topic_guid}")
+        
+        # Serialize the final mindmap to Mermaid format
+        logger.info("Serializing the mindmap to Mermaid format...")
+        serialize_result = await send_mcp_request(
+            host,
+            port,
+            "serialize_mindmap",
+            {
+                "format_type": "mermaid",
+            },
+        )
+        
+        if serialize_result["success"]:
+            mermaid_content = serialize_result["data"]["content"]
+            logger.info("Mermaid representation of the mindmap:")
+            logger.info(mermaid_content[:200] + "..." if len(mermaid_content) > 200 else mermaid_content)
+        else:
+            logger.error(f"Failed to serialize mindmap: {serialize_result.get('error', 'Unknown error')}")
+        
+        logger.info("Claude MCP example completed successfully")
+    
+    except Exception as e:
+        logger.error(f"Error in main: {str(e)}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+

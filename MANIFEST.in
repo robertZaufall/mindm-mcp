@@ -1,0 +1,9 @@
+global-exclude tests/*
+global-exclude .github/workflows/*
+global-exclude .gitignore
+global-exclude .repomix/*
+global-exclude MANIFEST.in
+global-exclude update_version.py
+global-exclude CLAUDE.md
+global-exclude Makefile
+

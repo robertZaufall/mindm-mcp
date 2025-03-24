@@ -1,10 +1,16 @@
 {
     "mcpServers": {
         "mindm": {
-            "command": "/Users/master/miniconda3/envs/mindm-mcp/bin/python",
+            "command": "uvx",
             "args": [
-                "-m", "mindm_mcp.server"
-            ]
+                "--index-url=https://test.pypi.org/simple/",
+                "--extra-index-url=https://pypi.org/simple/",
+                "mindm-mcp"
+            ],
+            "env": {
+                "PIP_INDEX_URL": "https://test.pypi.org/simple/",
+                "PIP_EXTRA_INDEX_URL": "https://pypi.org/simple/"
+            }
         }
     }
 }

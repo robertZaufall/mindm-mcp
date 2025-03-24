@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mindm_mcp"
-version = "0.0.1.2"
+version = "0.0.1.3"
 authors = [
   { name="Robert Zaufall" },
 ]
@@ -39,7 +39,7 @@ dev = [
 "Bug Tracker" = "https://github.com/robertZaufall/mindm_mcp/issues"
 
 [project.scripts]
-mindm-mcp-server = "mindm_mcp.server:main"
+mindm-mcp = "mindm_mcp.server:main"
 
 [tool.setuptools]
 packages = ["mindm_mcp"]

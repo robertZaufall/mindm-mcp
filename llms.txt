@@ -4,7 +4,7 @@ Directory structure:
     ├── pyproject.toml
     ├── update_version.py
     ├── examples/
-    │   └── usage_example.py
+    │   └── client.py
     └── mindm_mcp/
         ├── __init__.py
         └── server.py
@@ -45,7 +45,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mindm_mcp"
-version = "0.0.1.13"
+version = "0.0.1.2"
 authors = [
   { name="Robert Zaufall" },
 ]
@@ -60,7 +60,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "mindm>=0.0.3.8",
+  "mindm>=0.0.4.1",
   "uvicorn>=0.22.0",
   "aiohttp>=3.8.4",
   "pydantic>=1.10.7",
@@ -117,94 +117,489 @@ else:
 
 
 ================================================
-File: examples/usage_example.py
+File: examples/client.py
 ================================================
 #!/usr/bin/env python3
 """
-Example usage of the MCP for mindm library.
-Make sure MindManager is open with a document before running this script.
+client.py - Example client for interacting with the mindm MCP server
+
+This module demonstrates how to use the MCP client to interact with
+the mindm server to manipulate MindManager maps programmatically.
 """
 
 import json
-import subprocess
 import sys
-import os
+import logging
+import asyncio
+from typing import Dict, Any, Optional, List, Union
 
-def call_mcp(function_name, args=None):
+try:
+    from mcp.client import Client, ClientConfig
+except ImportError:
+    print("Error: Model Context Protocol SDK is required")
+    print("Install with: pip install mcp")
+    sys.exit(1)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("mindm-mcp-client")
+
+class MindManagerClient:
     """
-    Call the MCP handler with the given function name and arguments.
-    
-    Args:
-        function_name (str): Name of the MCP function to call
-        args (dict, optional): Arguments to pass to the function
-        
-    Returns:
-        dict: The response from the MCP handler
+    Client for interacting with the MindManager MCP server
     """
-    if args is None:
-        args = {}
+    
+    def __init__(self, server_url: str = "http://localhost:8000"):
+        """
+        Initialize the MindManager client
         
-    request = {
-        "function": function_name,
-        "args": args
-    }
+        Args:
+            server_url (str): URL of the MCP server
+        """
+        config = ClientConfig(server_url=server_url)
+        self.client = Client(config)
+        
+    async def connect(self):
+        """
+        Connect to the MCP server
+        """
+        await self.client.connect()
+        logger.info(f"Connected to MindManager MCP server at {self.client.config.server_url}")
     
-    # Convert request to JSON string
-    request_json = json.dumps(request)
+    async def disconnect(self):
+        """
+        Disconnect from the MCP server
+        """
+        await self.client.disconnect()
+        logger.info("Disconnected from MindManager MCP server")
     
-    # Call the MCP handler script
-    server_path = os.path.join(os.path.dirname(__file__), "..", "mindm_mcp", "server.py")
-    result = subprocess.run(
-        [sys.executable, server_path, request_json],
-        capture_output=True,
-        text=True
-    )
+    async def initialize(self, charttype: str = "auto", macos_access: str = "appscript") -> Dict[str, Any]:
+        """
+        Initialize the MindManager interface
+        
+        Args:
+            charttype (str): Chart type (auto, orgchart, radial)
+            macos_access (str): macOS access method (appscript, applescript)
+            
+        Returns:
+            Dict[str, Any]: Initialization status
+        """
+        return await self.client.call_tool("initialize", {
+            "charttype": charttype,
+            "macos_access": macos_access
+        })
     
-    # Parse and return the response
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError:
+    async def get_version(self) -> Dict[str, Any]:
+        """
+        Get the MindManager version
+        
+        Returns:
+            Dict[str, Any]: Version information
+        """
+        return await self.client.call_tool("get_version")
+    
+    async def get_mindmap(self, mode: str = "full") -> Dict[str, Any]:
+        """
+        Get the current mindmap structure
+        
+        Args:
+            mode (str): Attribute gathering mode (full, content, text)
+            
+        Returns:
+            Dict[str, Any]: Mindmap data
+        """
+        return await self.client.call_tool("get_mindmap", {
+            "mode": mode
+        })
+    
+    async def get_central_topic(self) -> Dict[str, Any]:
+        """
+        Get the central topic of the mindmap
+        
+        Returns:
+            Dict[str, Any]: Central topic data
+        """
+        return await self.client.call_tool("get_central_topic")
+    
+    async def get_selection(self) -> Dict[str, Any]:
+        """
+        Get the currently selected topics
+        
+        Returns:
+            Dict[str, Any]: Selected topics data
+        """
+        return await self.client.call_tool("get_selection")
+    
+    async def create_mindmap(self, mindmap_data: Dict[str, Any], charttype: str = "auto") -> Dict[str, Any]:
+        """
+        Create a new mindmap from the provided structure
+        
+        Args:
+            mindmap_data (Dict[str, Any]): Serialized mindmap structure
+            charttype (str): Chart type to use
+            
+        Returns:
+            Dict[str, Any]: Creation status
+        """
+        return await self.client.call_tool("create_mindmap", {
+            "mindmap_data": mindmap_data,
+            "charttype": charttype
+        })
+    
+    async def add_subtopic(self, parent_guid: str, text: str = "New Topic") -> Dict[str, Any]:
+        """
+        Add a subtopic to an existing topic
+        
+        Args:
+            parent_guid (str): GUID of the parent topic
+            text (str): Text content for the new subtopic
+            
+        Returns:
+            Dict[str, Any]: Operation status with new subtopic GUID
+        """
+        return await self.client.call_tool("add_subtopic", {
+            "parent_guid": parent_guid,
+            "text": text
+        })
+    
+    async def set_topic_text(self, guid: str, text: str) -> Dict[str, Any]:
+        """
+        Set the text content of a topic
+        
+        Args:
+            guid (str): GUID of the topic to update
+            text (str): New text content
+            
+        Returns:
+            Dict[str, Any]: Operation status
+        """
+        return await self.client.call_tool("set_topic_text", {
+            "guid": guid,
+            "text": text
+        })
+    
+    async def add_relationship(self, from_guid: str, to_guid: str, label: str = "") -> Dict[str, Any]:
+        """
+        Add a relationship between two topics
+        
+        Args:
+            from_guid (str): GUID of the source topic
+            to_guid (str): GUID of the target topic
+            label (str): Label for the relationship
+            
+        Returns:
+            Dict[str, Any]: Operation status
+        """
+        return await self.client.call_tool("add_relationship", {
+            "from_guid": from_guid,
+            "to_guid": to_guid,
+            "label": label
+        })
+    
+    async def add_tag(self, topic_guid: str, tag_text: str) -> Dict[str, Any]:
+        """
+        Add a tag to a topic
+        
+        Args:
+            topic_guid (str): GUID of the topic
+            tag_text (str): Text of the tag
+            
+        Returns:
+            Dict[str, Any]: Operation status
+        """
+        return await self.client.call_tool("add_tag", {
+            "topic_guid": topic_guid,
+            "tag_text": tag_text
+        })
+    
+    async def get_library_folder(self) -> Dict[str, Any]:
+        """
+        Get the MindManager library folder
+        
+        Returns:
+            Dict[str, Any]: Library folder path
+        """
+        return await self.client.call_tool("get_library_folder")
+    
+    async def set_background_image(self, image_path: str) -> Dict[str, Any]:
+        """
+        Set the background image for the current document
+        
+        Args:
+            image_path (str): Path to the image file
+            
+        Returns:
+            Dict[str, Any]: Operation status
+        """
+        return await self.client.call_tool("set_background_image", {
+            "image_path": image_path
+        })
+    
+    async def export_to_mermaid(self, id_only: bool = False) -> Dict[str, Any]:
+        """
+        Export the current mindmap to Mermaid format
+        
+        Args:
+            id_only (bool): If True, export with ID references only
+            
+        Returns:
+            Dict[str, Any]: Mermaid diagram representation
+        """
+        return await self.client.call_tool("export_to_mermaid", {
+            "id_only": id_only
+        })
+    
+    async def export_to_markdown(self, include_notes: bool = True) -> Dict[str, Any]:
+        """
+        Export the current mindmap to Markdown format
+        
+        Args:
+            include_notes (bool): If True, include notes
+            
+        Returns:
+            Dict[str, Any]: Markdown representation
+        """
+        return await self.client.call_tool("export_to_markdown", {
+            "include_notes": include_notes
+        })
+    
+    async def get_mindmanager_info(self) -> str:
+        """
+        Get information about the MindManager application
+        
+        Returns:
+            str: Information about MindManager
+        """
+        return await self.client.read_resource("mindmanager://info")
+    
+    async def iterate_topics(self, topic_guid: str, action: str, value: str = None) -> Dict[str, Any]:
+        """
+        Perform an action on all subtopics recursively
+        
+        Args:
+            topic_guid (str): GUID of the starting topic
+            action (str): Action to perform (e.g., 'uppercase', 'lowercase', 'prefix', 'suffix')
+            value (str): Value to use for prefix/suffix actions
+            
+        Returns:
+            Dict[str, Any]: Operation status
+        """
+        if not topic_guid:
+            return {"status": "error", "message": "Topic GUID is required"}
+        
+        # Get current topic text
+        topic_result = await self.get_topic_data(topic_guid)
+        if topic_result["status"] != "success":
+            return topic_result
+        
+        # Apply the action to the current topic
+        text = topic_result.get("text", "")
+        new_text = self._apply_text_action(text, action, value)
+        
+        # Update the topic
+        update_result = await self.set_topic_text(topic_guid, new_text)
+        if update_result["status"] != "success":
+            return update_result
+        
+        # Get subtopics
+        selection_result = await self.get_selection()
+        if selection_result["status"] != "success":
+            return selection_result
+        
+        # Process each subtopic recursively
+        results = []
+        for subtopic in topic_result.get("subtopics", []):
+            subtopic_guid = subtopic.get("guid", "")
+            if subtopic_guid:
+                subtopic_result = await self.iterate_topics(subtopic_guid, action, value)
+                results.append(subtopic_result)
+        
         return {
-            "status": "error",
-            "message": f"Failed to parse response: {result.stdout}",
-            "stderr": result.stderr
+            "status": "success", 
+            "topic_guid": topic_guid,
+            "text": new_text,
+            "subtopics_processed": len(results)
         }
-
-def main():
-    """Example workflow using the MCP for mindm."""
-    print("Getting mindmap from MindManager...")
-    result = call_mcp("get_mindmap", {"mode": "full"})
     
-    if result["status"] == "error":
-        print(f"Error: {result['message']}")
-        return
-    
-    print("\nCurrent mindmap information:")
-    print(f"Central topic: {result['mindmap']['central_topic']}")
-    print(f"Total topics: {result['mindmap']['topic_count']}")
-    print(f"Maximum level: {result['mindmap']['max_level']}")
-    
-    if result['mindmap']['selected_topics']:
-        print("\nSelected topics:")
-        for topic in result['mindmap']['selected_topics']:
-            print(f"- {topic}")
-    
-    # Ask user if they want to create a new mindmap
-    answer = input("\nDo you want to create a new mindmap from this structure? (y/n): ")
-    if answer.lower() == 'y':
-        print("\nCreating new mindmap...")
-        create_result = call_mcp("create_mindmap", {"verbose": True})
+    async def get_topic_data(self, topic_guid: str) -> Dict[str, Any]:
+        """
+        Get data for a specific topic by GUID
         
-        if create_result["status"] == "error":
-            print(f"Error: {create_result['message']}")
-        else:
-            print(f"Success: {create_result['message']}")
-            print(f"Created {create_result['topics_created']} topics")
+        Args:
+            topic_guid (str): GUID of the topic
+            
+        Returns:
+            Dict[str, Any]: Topic data
+        """
+        # This is a simplified implementation - in a real application,
+        # we would need proper topic data retrieval
+        mindmap_result = await self.get_mindmap(mode="full")
+        if mindmap_result["status"] != "success":
+            return {"status": "error", "message": "Failed to get mindmap"}
+        
+        # Find the topic with the matching GUID
+        # This is a simplified approach - in reality, we'd need recursive search
+        mindmap = mindmap_result.get("mindmap", {})
+        return self._find_topic_by_guid(mindmap, topic_guid)
     
-    print("\nDone.")
+    def _find_topic_by_guid(self, topic_data: Dict[str, Any], guid: str) -> Dict[str, Any]:
+        """
+        Recursively find a topic by GUID in the mindmap structure
+        
+        Args:
+            topic_data (Dict[str, Any]): Current topic data
+            guid (str): GUID to find
+            
+        Returns:
+            Dict[str, Any]: Found topic data or error
+        """
+        if topic_data.get("guid", "") == guid:
+            return {"status": "success", "topic": topic_data}
+        
+        for subtopic in topic_data.get("subtopics", []):
+            result = self._find_topic_by_guid(subtopic, guid)
+            if result["status"] == "success":
+                return result
+        
+        return {"status": "error", "message": f"Topic with GUID {guid} not found"}
+    
+    def _apply_text_action(self, text: str, action: str, value: str = None) -> str:
+        """
+        Apply a text transformation action
+        
+        Args:
+            text (str): Original text
+            action (str): Action to apply
+            value (str): Optional value for some actions
+            
+        Returns:
+            str: Transformed text
+        """
+        if action == "uppercase":
+            return text.upper()
+        elif action == "lowercase":
+            return text.lower()
+        elif action == "capitalize":
+            return text.capitalize()
+        elif action == "title":
+            return text.title()
+        elif action == "prefix" and value:
+            return f"{value}{text}"
+        elif action == "suffix" and value:
+            return f"{text}{value}"
+        elif action == "replace" and value and "," in value:
+            old, new = value.split(",", 1)
+            return text.replace(old, new)
+        else:
+            return text  # No change if action not recognized
+
+
+async def main():
+    """
+    Main function demonstrating client usage
+    """
+    client = MindManagerClient()
+    
+    try:
+        # Connect to the MCP server
+        await client.connect()
+        
+        # Initialize the connection to MindManager
+        init_result = await client.initialize()
+        if init_result["status"] != "success" and init_result["status"] != "warning":
+            logger.error(f"Failed to initialize MindManager: {init_result.get('message', 'Unknown error')}")
+            return
+        
+        logger.info(f"Connected to MindManager on {init_result.get('platform', 'unknown')} platform")
+        
+        # Get MindManager info from resource
+        info = await client.get_mindmanager_info()
+        logger.info(f"MindManager Info:\n{info}")
+        
+        # Get the version
+        version_result = await client.get_version()
+        if version_result["status"] == "success":
+            logger.info(f"MindManager version: {version_result.get('version', 'unknown')}")
+        
+        # Get the central topic
+        central_result = await client.get_central_topic()
+        if central_result["status"] == "success":
+            central_topic = central_result.get("topic", {})
+            logger.info(f"Central topic: {central_topic.get('text', 'No text')}")
+        
+            # Add a subtopic to the central topic
+            central_guid = central_topic.get("guid", "")
+            if central_guid:
+                subtopic_result = await client.add_subtopic(central_guid, "New MCP Subtopic")
+                if subtopic_result["status"] == "success":
+                    logger.info(f"Added subtopic: {subtopic_result.get('text', 'unknown')}")
+                    subtopic_guid = subtopic_result.get("guid", "")
+                    
+                    # Add another level of subtopics
+                    if subtopic_guid:
+                        for i in range(3):
+                            sub_result = await client.add_subtopic(subtopic_guid, f"Nested Topic {i+1}")
+                            if sub_result["status"] == "success":
+                                logger.info(f"  Added nested topic: {sub_result.get('text', 'unknown')}")
+                        
+                        # Add relationships between nested topics
+                        nested_topics = []
+                        selection_result = await client.get_selection()
+                        if selection_result["status"] == "success":
+                            nested_topics = selection_result.get("selection", [])
+                            
+                        if len(nested_topics) >= 2:
+                            first_guid = nested_topics[0].get("guid", "")
+                            second_guid = nested_topics[1].get("guid", "")
+                            if first_guid and second_guid:
+                                rel_result = await client.add_relationship(first_guid, second_guid, "Related to")
+                                if rel_result["status"] == "success":
+                                    logger.info(f"Added relationship between topics")
+                        
+                        # Add tags to topics
+                        for i, topic in enumerate(nested_topics):
+                            topic_guid = topic.get("guid", "")
+                            if topic_guid:
+                                tag_result = await client.add_tag(topic_guid, f"Priority-{i+1}")
+                                if tag_result["status"] == "success":
+                                    logger.info(f"Added tag to topic: Priority-{i+1}")
+        
+        # Export to Mermaid format
+        mermaid_result = await client.export_to_mermaid()
+        if mermaid_result["status"] == "success":
+            mermaid_content = mermaid_result.get("mermaid", "")
+            preview_length = min(len(mermaid_content), 200)
+            logger.info(f"Mermaid Diagram Preview:\n{mermaid_content[:preview_length]}...")
+        
+        # Export to Markdown format
+        markdown_result = await client.export_to_markdown()
+        if markdown_result["status"] == "success":
+            markdown_content = markdown_result.get("markdown", "")
+            preview_length = min(len(markdown_content), 200)
+            logger.info(f"Markdown Content Preview:\n{markdown_content[:preview_length]}...")
+        
+        # Demonstrate topic text transformation
+        if central_guid:
+            transform_result = await client.iterate_topics(central_guid, "uppercase")
+            if transform_result["status"] == "success":
+                logger.info(f"Transformed topics to uppercase: {transform_result.get('subtopics_processed', 0)} subtopics processed")
+        
+        logger.info("Client example completed successfully")
+    
+    except Exception as e:
+        logger.error(f"Error in client example: {str(e)}")
+    
+    finally:
+        # Disconnect from the server
+        await client.disconnect()
+
 
 if __name__ == "__main__":
-    main()
+    try:
+        # Run the main function
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Client example interrupted by user")
 
 
 
@@ -225,218 +620,713 @@ File: mindm_mcp/server.py
 ================================================
 #!/usr/bin/env python3
 """
-Minimal MCP implementation for mindm library.
-This script provides direct access to mindm functions from Claude Desktop.
+server.py - FastMCP implementation for the mindm library
+
+This module implements a Model Context Protocol (MCP) server
+for interacting with MindManager through the mindm library using FastMCP.
 """
 
-import sys
 import json
-import traceback
-from typing import Dict, Any, Callable, Optional, List, Union
+import os
+import sys
+import logging
+from typing import Dict, Any, List, Optional, Union
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 
-# Import the mindm library
-import mindmap.mindmap as mm
+try:
+    from mcp.server.fastmcp import FastMCP, Context
+except ImportError:
+    print("Error: Model Context Protocol SDK is required")
+    print("Install with: pip install mcp")
+    sys.exit(1)
 
-class MCPHandler:
+import mindm.mindmanager as mm
+import mindmap.mindmap as mindmap
+import mindmap.serialization as serialization
+from mindmap.mindmap import MindmapTopic, MindmapLink, MindmapNotes, MindmapTag, MindmapReference, MindmapImage, MindmapIcon
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("mindm-mcp")
+
+@dataclass
+class AppContext:
+    """Application context for the MindManager MCP server"""
+    mindmanager: Optional[mm.Mindmanager] = None
+    platform: Optional[str] = None
+    document: Optional[Any] = None
+    charttype: str = "auto"
+    macos_access: str = "appscript"
+
+@asynccontextmanager
+async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     """
-    Model Context Protocol handler for mindm library.
-    Provides a simple interface to call mindm functions from Claude Desktop.
-    """
+    Manage application lifecycle with context
     
-    def __init__(self):
-        """Initialize the MCP handler."""
-        self.document = None
-        self.functions = {
-            "get_mindmap": self.get_mindmap,
-            "create_mindmap": self.create_mindmap,
-            "list_functions": self.list_functions,
+    Args:
+        server: The FastMCP server instance
+        
+    Yields:
+        AppContext: Application context for the server
+    """
+    # Initialize on startup
+    context = AppContext()
+    logger.info("MindManager MCP server starting")
+    
+    try:
+        yield context
+    finally:
+        # Cleanup on shutdown
+        if context.mindmanager is not None:
+            # Note: This is a simplified cleanup since Mindmanager in mindm
+            # doesn't have a specific shutdown method
+            context.mindmanager = None
+            logger.info("MindManager MCP server shutting down")
+
+# Create the MCP server
+mcp = FastMCP(
+    "MindManager",
+    description="MindManager Model Context Protocol server for Windows and macOS",
+    lifespan=app_lifespan
+)
+
+@mcp.tool()
+async def initialize(
+    charttype: str = "auto", 
+    macos_access: str = "appscript",
+    ctx: Context[AppContext] = None
+) -> Dict[str, Any]:
+    """
+    Initialize the MindManager interface
+    
+    Args:
+        charttype: Chart type (auto, orgchart, radial)
+        macos_access: macOS access method (appscript, applescript)
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Initialization status with platform information
+    """
+    try:
+        # Initialize MindManager
+        ctx.app.charttype = charttype
+        ctx.app.macos_access = macos_access
+        
+        ctx.app.mindmanager = mm.Mindmanager(charttype, macos_access)
+        ctx.app.platform = ctx.app.mindmanager.platform
+        
+        if ctx.app.mindmanager.document_exists():
+            ctx.app.document = ctx.app.mindmanager.get_active_document_object()
+            logger.info(f"Initialized MindManager on {ctx.app.platform} platform")
+            return {"status": "success", "platform": ctx.app.platform}
+        else:
+            logger.warning("No MindManager document is open")
+            return {"status": "warning", "message": "No document is open", "platform": ctx.app.platform}
+                
+    except Exception as e:
+        logger.error(f"Error initializing MindManager: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def get_version(ctx: Context[AppContext] = None) -> Dict[str, Any]:
+    """
+    Get the MindManager version
+    
+    Args:
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Version information
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    try:
+        version = ctx.app.mindmanager.get_version()
+        return {"status": "success", "version": version}
+    except Exception as e:
+        logger.error(f"Error getting version: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def get_mindmap(
+    mode: str = "full",
+    ctx: Context[AppContext] = None
+) -> Dict[str, Any]:
+    """
+    Get the current mindmap structure
+    
+    Args:
+        mode: Attribute gathering mode (full, content, text)
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Mindmap data
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    if not ctx.app.mindmanager.document_exists():
+        return {"status": "error", "message": "No document is open"}
+    
+    try:
+        # Create MindmapDocument instance
+        doc = mindmap.MindmapDocument(
+            charttype=ctx.app.charttype, 
+            macos_access=ctx.app.macos_access if ctx.app.platform == "darwin" else None
+        )
+        
+        # Get the mindmap
+        result = doc.get_mindmap(mode=mode)
+        if not result:
+            return {"status": "error", "message": "Failed to get mindmap"}
+        
+        # Serialize mindmap
+        guid_mapping = {}
+        serialization.build_mapping(doc.mindmap, guid_mapping)
+        serialized = serialization.serialize_object_simple(doc.mindmap)
+        
+        return {
+            "status": "success", 
+            "mindmap": serialized,
+            "max_topic_level": doc.max_topic_level
         }
+        
+    except Exception as e:
+        logger.error(f"Error getting mindmap: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def get_central_topic(ctx: Context[AppContext] = None) -> Dict[str, Any]:
+    """
+    Get the central topic of the mindmap
     
-    def list_functions(self, args: Dict[str, Any] = None) -> Dict[str, Any]:
-        """List all available functions."""
+    Args:
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Central topic data
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    try:
+        central_topic = ctx.app.mindmanager.get_central_topic()
+        if central_topic:
+            serialized = serialization.serialize_object_simple(central_topic)
+            return {"status": "success", "topic": serialized}
+        else:
+            return {"status": "error", "message": "Could not get central topic"}
+    except Exception as e:
+        logger.error(f"Error getting central topic: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def get_selection(ctx: Context[AppContext] = None) -> Dict[str, Any]:
+    """
+    Get the currently selected topics
+    
+    Args:
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Selected topics data
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    try:
+        selection = ctx.app.mindmanager.get_selection()
+        
+        if not selection:
+            return {"status": "success", "selection": []}
+        
+        selected_topics = []
+        for topic in selection:
+            topic_data = {
+                "guid": ctx.app.mindmanager.get_guid_from_topic(topic),
+                "text": ctx.app.mindmanager.get_text_from_topic(topic),
+                "level": ctx.app.mindmanager.get_level_from_topic(topic)
+            }
+            selected_topics.append(topic_data)
+            
+        return {"status": "success", "selection": selected_topics}
+    except Exception as e:
+        logger.error(f"Error getting selection: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def create_mindmap(
+    mindmap_data: Dict[str, Any],
+    charttype: str = "auto",
+    ctx: Context[AppContext] = None
+) -> Dict[str, Any]:
+    """
+    Create a new mindmap from the provided structure
+    
+    Args:
+        mindmap_data: Serialized mindmap structure
+        charttype: Chart type to use
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Creation status
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    try:
+        if not mindmap_data:
+            return {"status": "error", "message": "No mindmap data provided"}
+        
+        # Convert serialized data back to a MindmapTopic structure
+        central_topic = MindmapTopic(
+            text=mindmap_data.get("text", "New Mindmap"),
+            guid=mindmap_data.get("guid", "")
+        )
+        
+        # Process subtopics recursively
+        def process_subtopics(parent_topic, subtopics_data):
+            if not subtopics_data:
+                return
+            
+            for subtopic_data in subtopics_data:
+                subtopic = MindmapTopic(
+                    text=subtopic_data.get("text", ""),
+                    guid=subtopic_data.get("guid", ""),
+                    parent=parent_topic
+                )
+                
+                if "notes" in subtopic_data:
+                    notes_data = subtopic_data["notes"]
+                    subtopic.notes = MindmapNotes(
+                        text=notes_data.get("text", ""),
+                        xhtml=notes_data.get("xhtml", ""),
+                        rtf=notes_data.get("rtf", "")
+                    )
+                
+                # Add tags
+                if "tags" in subtopic_data:
+                    for tag_text in subtopic_data["tags"]:
+                        subtopic.tags.append(MindmapTag(text=tag_text))
+                
+                # Process links
+                if "links" in subtopic_data:
+                    for link_data in subtopic_data["links"]:
+                        subtopic.links.append(MindmapLink(
+                            text=link_data.get("text", ""),
+                            url=link_data.get("url", ""),
+                            guid=link_data.get("guid", "")
+                        ))
+                
+                # Process references
+                if "references" in subtopic_data:
+                    for ref_data in subtopic_data["references"]:
+                        subtopic.references.append(MindmapReference(
+                            guid_1=ref_data.get("guid_1", ""),
+                            guid_2=ref_data.get("guid_2", ""),
+                            direction=ref_data.get("direction", 1),
+                            label=ref_data.get("label", "")
+                        ))
+                
+                parent_topic.subtopics.append(subtopic)
+                
+                # Process nested subtopics
+                if "subtopics" in subtopic_data:
+                    process_subtopics(subtopic, subtopic_data["subtopics"])
+        
+        # Process main subtopics
+        if "subtopics" in mindmap_data:
+            process_subtopics(central_topic, mindmap_data["subtopics"])
+        
+        # Create document and mindmap
+        doc = mindmap.MindmapDocument(charttype=charttype)
+        doc.mindmap = central_topic
+        doc.create_mindmap()
+        
+        return {"status": "success", "message": "Mindmap created successfully"}
+    except Exception as e:
+        logger.error(f"Error creating mindmap: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def add_subtopic(
+    parent_guid: str,
+    text: str = "New Topic",
+    ctx: Context[AppContext] = None
+) -> Dict[str, Any]:
+    """
+    Add a subtopic to an existing topic
+    
+    Args:
+        parent_guid: GUID of the parent topic
+        text: Text content for the new subtopic
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Operation status with new subtopic GUID
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    try:
+        if not parent_guid:
+            return {"status": "error", "message": "Parent GUID is required"}
+        
+        # Get the parent topic
+        parent = ctx.app.mindmanager.get_topic_by_id(parent_guid)
+        if not parent:
+            return {"status": "error", "message": "Parent topic not found"}
+        
+        # Add the subtopic
+        subtopic = ctx.app.mindmanager.add_subtopic_to_topic(parent, text)
+        if not subtopic:
+            return {"status": "error", "message": "Failed to create subtopic"}
+        
+        subtopic_guid = ctx.app.mindmanager.get_guid_from_topic(subtopic)
+        
         return {
             "status": "success",
-            "functions": list(self.functions.keys())
+            "guid": subtopic_guid,
+            "text": text
         }
-    
-    def get_mindmap(self, args: Dict[str, Any] = None) -> Dict[str, Any]:
-        """
-        Load a mindmap from the currently open MindManager document.
-        
-        Args:
-            args (Dict[str, Any], optional): Optional arguments.
-                mode: 'full', 'content', or 'text' (default: 'full')
-        
-        Returns:
-            Dict[str, Any]: Status and mindmap information.
-        """
-        try:
-            # Create a document if we don't have one
-            if self.document is None:
-                self.document = mm.MindmapDocument()
-            
-            # Extract mode parameter if provided
-            mode = 'full'
-            if args and 'mode' in args:
-                mode = args['mode']
-            
-            # Get the mindmap
-            result = self.document.get_mindmap(mode=mode)
-            
-            if result:
-                # Extract basic information (not the full object which could be huge)
-                central_topic_text = self.document.mindmap.text
-                topic_count = self._count_topics(self.document.mindmap)
-                selected_count = len(self.document.selected_topic_texts)
-                
-                # Get grounding information
-                top_most_topic, subtopics = self.document.get_grounding_information()
-                
-                return {
-                    "status": "success",
-                    "mindmap": {
-                        "central_topic": central_topic_text,
-                        "topic_count": topic_count,
-                        "max_level": self.document.max_topic_level,
-                        "selected_topics": self.document.selected_topic_texts,
-                        "top_most_topic": top_most_topic,
-                        "subtopics": subtopics
-                    }
-                }
-            else:
-                return {
-                    "status": "error",
-                    "message": "Failed to get mindmap. No document is open in MindManager."
-                }
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": str(e),
-                "traceback": traceback.format_exc()
-            }
-    
-    def create_mindmap(self, args: Dict[str, Any] = None) -> Dict[str, Any]:
-        """
-        Create a new mindmap document based on the loaded mindmap structure.
-        
-        Args:
-            args (Dict[str, Any], optional): Optional arguments.
-                verbose: Whether to enable verbose output (default: False)
-        
-        Returns:
-            Dict[str, Any]: Status and creation result.
-        """
-        try:
-            # Check if we have a document and mindmap loaded
-            if self.document is None or self.document.mindmap is None:
-                return {
-                    "status": "error",
-                    "message": "No mindmap loaded. Call get_mindmap first."
-                }
-            
-            # Extract verbose parameter if provided
-            verbose = False
-            if args and 'verbose' in args:
-                verbose = args['verbose']
-            
-            # Create the mindmap
-            self.document.create_mindmap(verbose=verbose)
-            
-            return {
-                "status": "success",
-                "message": "Mindmap created successfully",
-                "topics_created": self._count_topics(self.document.mindmap)
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": str(e),
-                "traceback": traceback.format_exc()
-            }
-    
-    def _count_topics(self, topic, count=0, visited=None):
-        """
-        Recursively count topics in a mindmap.
-        
-        Args:
-            topic: The topic to start counting from
-            count: Current count
-            visited: Set of visited topics to prevent infinite recursion
-            
-        Returns:
-            int: Total count of topics
-        """
-        if visited is None:
-            visited = set()
-            
-        if topic.guid in visited:
-            return count
-            
-        visited.add(topic.guid)
-        count += 1
-        
-        for subtopic in topic.subtopics:
-            count = self._count_topics(subtopic, count, visited)
-            
-        return count
-    
-    def handle_request(self, request_str: str) -> str:
-        """
-        Parse and handle MCP requests.
-        
-        Args:
-            request_str (str): JSON string with function name and arguments
-            
-        Returns:
-            str: JSON response string
-        """
-        try:
-            request = json.loads(request_str)
-            function_name = request.get("function", "")
-            args = request.get("args", {})
-            
-            if function_name in self.functions:
-                result = self.functions[function_name](args)
-                return json.dumps(result)
-            else:
-                return json.dumps({
-                    "status": "error",
-                    "message": f"Unknown function: {function_name}",
-                    "available_functions": list(self.functions.keys())
-                })
-        except Exception as e:
-            return json.dumps({
-                "status": "error",
-                "message": f"Error handling request: {str(e)}",
-                "traceback": traceback.format_exc()
-            })
+    except Exception as e:
+        logger.error(f"Error adding subtopic: {str(e)}")
+        return {"status": "error", "message": str(e)}
 
-def main():
-    """Main entry point for the MCP handler."""
-    handler = MCPHandler()
+@mcp.tool()
+async def set_topic_text(
+    guid: str,
+    text: str,
+    ctx: Context[AppContext] = None
+) -> Dict[str, Any]:
+    """
+    Set the text content of a topic
     
-    # If arguments are provided, process as a single request
-    if len(sys.argv) > 1:
-        request = sys.argv[1]
-        response = handler.handle_request(request)
-        print(response)
-        return
+    Args:
+        guid: GUID of the topic to update
+        text: New text content
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Operation status
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
     
-    # Otherwise, enter interactive mode
-    while True:
-        try:
-            line = input("> ")
-            if line.lower() in ["exit", "quit"]:
-                break
-                
-            response = handler.handle_request(line)
-            print(response)
-        except KeyboardInterrupt:
-            break
-        except Exception as e:
-            print(f"Error: {e}")
+    try:
+        if not guid:
+            return {"status": "error", "message": "Topic GUID is required"}
+        
+        # Get the topic
+        topic = ctx.app.mindmanager.get_topic_by_id(guid)
+        if not topic:
+            return {"status": "error", "message": "Topic not found"}
+        
+        # Update the text
+        ctx.app.mindmanager.set_text_to_topic(topic, text)
+        
+        return {
+            "status": "success",
+            "guid": guid,
+            "text": text
+        }
+    except Exception as e:
+        logger.error(f"Error setting topic text: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def add_relationship(
+    from_guid: str,
+    to_guid: str,
+    label: str = "",
+    ctx: Context[AppContext] = None
+) -> Dict[str, Any]:
+    """
+    Add a relationship between two topics
+    
+    Args:
+        from_guid: GUID of the source topic
+        to_guid: GUID of the target topic
+        label: Label for the relationship
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Operation status
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    try:
+        if not from_guid or not to_guid:
+            return {"status": "error", "message": "Source and target GUIDs are required"}
+        
+        # Add the relationship
+        ctx.app.mindmanager.add_relationship(from_guid, to_guid, label)
+        
+        return {
+            "status": "success",
+            "from_guid": from_guid,
+            "to_guid": to_guid,
+            "label": label
+        }
+    except Exception as e:
+        logger.error(f"Error adding relationship: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def add_tag(
+    topic_guid: str,
+    tag_text: str,
+    ctx: Context[AppContext] = None
+) -> Dict[str, Any]:
+    """
+    Add a tag to a topic
+    
+    Args:
+        topic_guid: GUID of the topic
+        tag_text: Text of the tag
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Operation status
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    try:
+        if not topic_guid:
+            return {"status": "error", "message": "Topic GUID is required"}
+        
+        if not tag_text:
+            return {"status": "error", "message": "Tag text is required"}
+        
+        # Add the tag
+        ctx.app.mindmanager.add_tag_to_topic(topic=None, tag_text=tag_text, topic_guid=topic_guid)
+        
+        return {
+            "status": "success",
+            "topic_guid": topic_guid,
+            "tag_text": tag_text
+        }
+    except Exception as e:
+        logger.error(f"Error adding tag: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def get_library_folder(ctx: Context[AppContext] = None) -> Dict[str, Any]:
+    """
+    Get the MindManager library folder
+    
+    Args:
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Library folder path
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    try:
+        library_folder = ctx.app.mindmanager.get_library_folder()
+        return {
+            "status": "success",
+            "library_folder": library_folder,
+            "platform": ctx.app.platform
+        }
+    except Exception as e:
+        logger.error(f"Error getting library folder: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def set_background_image(
+    image_path: str,
+    ctx: Context[AppContext] = None
+) -> Dict[str, Any]:
+    """
+    Set the background image for the current document
+    
+    Args:
+        image_path: Path to the image file
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Operation status
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    try:
+        if not image_path:
+            return {"status": "error", "message": "Image path is required"}
+        
+        # Check if the file exists
+        if not os.path.exists(image_path):
+            return {"status": "error", "message": f"Image file not found: {image_path}"}
+        
+        # Set the background image
+        ctx.app.mindmanager.set_document_background_image(image_path)
+        
+        return {
+            "status": "success",
+            "image_path": image_path
+        }
+    except Exception as e:
+        logger.error(f"Error setting background image: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def export_to_mermaid(
+    id_only: bool = False,
+    ctx: Context[AppContext] = None
+) -> Dict[str, Any]:
+    """
+    Export the current mindmap to Mermaid format
+    
+    Args:
+        id_only: If True, export with ID references only
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Mermaid diagram representation
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    if not ctx.app.mindmanager.document_exists():
+        return {"status": "error", "message": "No document is open"}
+    
+    try:
+        # Create MindmapDocument instance
+        doc = mindmap.MindmapDocument(
+            charttype=ctx.app.charttype, 
+            macos_access=ctx.app.macos_access if ctx.app.platform == "darwin" else None
+        )
+        
+        # Get the mindmap
+        result = doc.get_mindmap(mode="full")
+        if not result:
+            return {"status": "error", "message": "Failed to get mindmap"}
+        
+        # Create GUID mapping and serialize to Mermaid
+        guid_mapping = {}
+        serialization.build_mapping(doc.mindmap, guid_mapping)
+        mermaid = serialization.serialize_mindmap(doc.mindmap, guid_mapping, id_only=id_only)
+        
+        return {
+            "status": "success",
+            "mermaid": mermaid
+        }
+    except Exception as e:
+        logger.error(f"Error exporting to Mermaid: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
+async def export_to_markdown(
+    include_notes: bool = True,
+    ctx: Context[AppContext] = None
+) -> Dict[str, Any]:
+    """
+    Export the current mindmap to Markdown format
+    
+    Args:
+        include_notes: If True, include notes
+        ctx: MCP context
+        
+    Returns:
+        Dict[str, Any]: Markdown representation
+    """
+    if not ctx.app.mindmanager:
+        return {"status": "error", "message": "MindManager not initialized"}
+    
+    if not ctx.app.mindmanager.document_exists():
+        return {"status": "error", "message": "No document is open"}
+    
+    try:
+        # Create MindmapDocument instance
+        doc = mindmap.MindmapDocument(
+            charttype=ctx.app.charttype, 
+            macos_access=ctx.app.macos_access if ctx.app.platform == "darwin" else None
+        )
+        
+        # Get the mindmap
+        result = doc.get_mindmap(mode="full" if include_notes else "text")
+        if not result:
+            return {"status": "error", "message": "Failed to get mindmap"}
+        
+        # Serialize to Markdown
+        markdown = serialization.serialize_mindmap_markdown(doc.mindmap, include_notes=include_notes)
+        
+        return {
+            "status": "success",
+            "markdown": markdown
+        }
+    except Exception as e:
+        logger.error(f"Error exporting to Markdown: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@mcp.resource("mindmanager://info")
+async def get_mindmanager_info(ctx: Context[AppContext] = None) -> str:
+    """
+    Get information about the MindManager application
+    
+    Args:
+        ctx: MCP context
+        
+    Returns:
+        str: Information about MindManager
+    """
+    if not ctx.app.mindmanager:
+        return "MindManager is not initialized"
+    
+    try:
+        version = ctx.app.mindmanager.get_version()
+        platform = ctx.app.platform
+        library = ctx.app.mindmanager.get_library_folder()
+        
+        info = (
+            f"MindManager Information\n"
+            f"----------------------\n"
+            f"Version: {version}\n"
+            f"Platform: {platform}\n"
+            f"Library Folder: {library}\n"
+        )
+        
+        if ctx.app.mindmanager.document_exists():
+            info += "Status: Document is open\n"
+        else:
+            info += "Status: No document is open\n"
+            
+        return info
+    except Exception as e:
+        logger.error(f"Error getting MindManager info: {str(e)}")
+        return f"Error getting MindManager info: {str(e)}"
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="MindManager MCP Server")
+    parser.add_argument("--host", type=str, default="localhost", help="Host to bind the server to")
+    parser.add_argument("--port", type=int, default=8000, help="Port to bind the server to")
+    args = parser.parse_args()
+    
+    logger.info(f"Starting MindManager MCP server on {args.host}:{args.port}")
+    
+    # This will use the FastMCP CLI to start the server
+    import sys
+    sys.argv = [
+        sys.argv[0],
+        "--host", args.host,
+        "--port", str(args.port)
+    ]
+    mcp._cli()
 
 

@@ -1,0 +1,36 @@
+name: Build and Publish TestPyPI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/mindm-mcp
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel build twine sphinx sphinx-pyproject
+
+      - name: Build the package
+        run: python -m build
+  
+      - name: Verify package
+        run: twine check dist/*
+
+      - name: Publish to TestPyPI
+        run: twine upload --verbose --repository testpypi dist/*

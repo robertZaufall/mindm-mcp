@@ -31,6 +31,7 @@ This server allows you to programmatically interact with MindManager through the
 ```bash
 # Install required packages
 pip install mcp
+pip install -U --index-url=https://test.pypi.org/simple/ --extra-index-url=https://pypi.org/simple/ mindm mindm-mcp
 
 # Clone the repository (if you're using it from a repository)
 git clone https://github.com/robertZaufall/mindm-mcp.git

@@ -82,7 +82,7 @@ mcp = FastMCP(
 async def initialize(
     charttype: str = "auto", 
     macos_access: str = "applescript",
-    ctx: Context[AppContext] = None
+    ctx: Context[AppContext, Any] = None
 ) -> Dict[str, Any]:
     """
     Initialize the MindManager interface
@@ -116,7 +116,7 @@ async def initialize(
         return {"status": "error", "message": str(e)}
 
 @mcp.tool()
-async def get_version(ctx: Context[AppContext] = None) -> Dict[str, Any]:
+async def get_version(ctx: Context[AppContext, Any] = None) -> Dict[str, Any]:
     """
     Get the MindManager version
     
@@ -139,7 +139,7 @@ async def get_version(ctx: Context[AppContext] = None) -> Dict[str, Any]:
 @mcp.tool()
 async def get_mindmap(
     mode: str = "full",
-    ctx: Context[AppContext] = None
+    ctx: Context[AppContext, Any] = None
 ) -> Dict[str, Any]:
     """
     Get the current mindmap structure
@@ -185,7 +185,7 @@ async def get_mindmap(
         return {"status": "error", "message": str(e)}
 
 @mcp.tool()
-async def get_central_topic(ctx: Context[AppContext] = None) -> Dict[str, Any]:
+async def get_central_topic(ctx: Context[AppContext, Any] = None) -> Dict[str, Any]:
     """
     Get the central topic of the mindmap
     
@@ -210,7 +210,7 @@ async def get_central_topic(ctx: Context[AppContext] = None) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 @mcp.tool()
-async def get_selection(ctx: Context[AppContext] = None) -> Dict[str, Any]:
+async def get_selection(ctx: Context[AppContext, Any] = None) -> Dict[str, Any]:
     """
     Get the currently selected topics
     
@@ -247,7 +247,7 @@ async def get_selection(ctx: Context[AppContext] = None) -> Dict[str, Any]:
 async def create_mindmap(
     mindmap_data: Dict[str, Any],
     charttype: str = "auto",
-    ctx: Context[AppContext] = None
+    ctx: Context[AppContext, Any] = None
 ) -> Dict[str, Any]:
     """
     Create a new mindmap from the provided structure
@@ -341,7 +341,7 @@ async def create_mindmap(
 async def add_subtopic(
     parent_guid: str,
     text: str = "New Topic",
-    ctx: Context[AppContext] = None
+    ctx: Context[AppContext, Any] = None
 ) -> Dict[str, Any]:
     """
     Add a subtopic to an existing topic
@@ -386,7 +386,7 @@ async def add_subtopic(
 async def set_topic_text(
     guid: str,
     text: str,
-    ctx: Context[AppContext] = None
+    ctx: Context[AppContext, Any] = None
 ) -> Dict[str, Any]:
     """
     Set the text content of a topic
@@ -428,7 +428,7 @@ async def add_relationship(
     from_guid: str,
     to_guid: str,
     label: str = "",
-    ctx: Context[AppContext] = None
+    ctx: Context[AppContext, Any] = None
 ) -> Dict[str, Any]:
     """
     Add a relationship between two topics
@@ -466,7 +466,7 @@ async def add_relationship(
 async def add_tag(
     topic_guid: str,
     tag_text: str,
-    ctx: Context[AppContext] = None
+    ctx: Context[AppContext, Any] = None
 ) -> Dict[str, Any]:
     """
     Add a tag to a topic
@@ -502,7 +502,7 @@ async def add_tag(
         return {"status": "error", "message": str(e)}
 
 @mcp.tool()
-async def get_library_folder(ctx: Context[AppContext] = None) -> Dict[str, Any]:
+async def get_library_folder(ctx: Context[AppContext, Any] = None) -> Dict[str, Any]:
     """
     Get the MindManager library folder
     
@@ -529,7 +529,7 @@ async def get_library_folder(ctx: Context[AppContext] = None) -> Dict[str, Any]:
 @mcp.tool()
 async def set_background_image(
     image_path: str,
-    ctx: Context[AppContext] = None
+    ctx: Context[AppContext, Any] = None
 ) -> Dict[str, Any]:
     """
     Set the background image for the current document
@@ -566,7 +566,7 @@ async def set_background_image(
 @mcp.tool()
 async def export_to_mermaid(
     id_only: bool = False,
-    ctx: Context[AppContext] = None
+    ctx: Context[AppContext, Any] = None
 ) -> Dict[str, Any]:
     """
     Export the current mindmap to Mermaid format
@@ -612,7 +612,7 @@ async def export_to_mermaid(
 @mcp.tool()
 async def export_to_markdown(
     include_notes: bool = True,
-    ctx: Context[AppContext] = None
+    ctx: Context[AppContext, Any] = None
 ) -> Dict[str, Any]:
     """
     Export the current mindmap to Markdown format
@@ -654,20 +654,27 @@ async def export_to_markdown(
         return {"status": "error", "message": str(e)}
 
 @mcp.resource("mindmanager://info")
-async def get_mindmanager_info(ctx: Context[AppContext] = None) -> str:
+async def get_mindmanager_info() -> str:
     """
     Get information about the MindManager application
     
-    Args:
-        ctx: MCP context
-        
     Returns:
         str: Information about MindManager
     """
-    if not ctx.app.mindmanager:
-        return "MindManager is not initialized"
+    # Now, how do we access the context?
+    # Let's try to get it from a global variable or another approach
+    
+    # Example approach using a global variable to access the context
+    from mcp.server.fastmcp import get_current_context
     
     try:
+        # Get the current context
+        ctx = get_current_context()
+        
+        # Check if MindManager is initialized
+        if not hasattr(ctx.app, 'mindmanager') or ctx.app.mindmanager is None:
+            return "MindManager is not initialized"
+        
         version = ctx.app.mindmanager.get_version()
         platform = ctx.app.platform
         library = ctx.app.mindmanager.get_library_folder()
@@ -692,6 +699,8 @@ async def get_mindmanager_info(ctx: Context[AppContext] = None) -> str:
 
 if __name__ == "__main__":
     import argparse
+    import uvicorn
+    import anyio
     
     parser = argparse.ArgumentParser(description="MindManager MCP Server")
     parser.add_argument("--host", type=str, default="localhost", help="Host to bind the server to")
@@ -700,11 +709,13 @@ if __name__ == "__main__":
     
     logger.info(f"Starting MindManager MCP server on {args.host}:{args.port}")
     
-    # This will use the FastMCP CLI to start the server
-    import sys
-    sys.argv = [
-        sys.argv[0],
-        "--host", args.host,
-        "--port", str(args.port)
-    ]
-    mcp._cli()
+    # Option 1: Try running with transport="sse" explicitly
+    try:
+        from mcp.server.config import set_server_settings
+        # Try to set server settings if the function exists
+        set_server_settings(host=args.host, port=args.port)
+    except ImportError:
+        pass
+    
+    # Run the server with sse transport (web server)
+    mcp.run(transport="sse")

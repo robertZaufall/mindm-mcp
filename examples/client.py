@@ -8,12 +8,18 @@ the mindm server to manipulate MindManager maps programmatically.
 
 import json
 import sys
+import os
 import logging
 import asyncio
 from typing import Dict, Any, Optional, List, Union
+from contextlib import AsyncExitStack
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 try:
-    from mcp.client import Client, ClientConfig
+    # Updated imports for current MCP SDK version
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
 except ImportError:
     print("Error: Model Context Protocol SDK is required")
     print("Install with: pip install mcp")
@@ -28,28 +34,44 @@ class MindManagerClient:
     Client for interacting with the MindManager MCP server
     """
     
-    def __init__(self, server_url: str = "http://localhost:8000"):
+    def __init__(self, server_path: str = None):
         """
         Initialize the MindManager client
         
         Args:
-            server_url (str): URL of the MCP server
+            server_path (str): Path to the server script
         """
-        config = ClientConfig(server_url=server_url)
-        self.client = Client(config)
+        self.server_path = server_path if server_path else "-m mindm_mcp.server"
+        self.session = None
+        self.exit_stack = AsyncExitStack()
         
     async def connect(self):
         """
         Connect to the MCP server
         """
-        await self.client.connect()
-        logger.info(f"Connected to MindManager MCP server at {self.client.config.server_url}")
+        # Create server parameters for stdio connection
+        server_params = StdioServerParameters(
+            command="python",
+            args=[self.server_path],
+            env=None
+        )
+        
+        # Use AsyncExitStack to manage the async context managers
+        read_write = await self.exit_stack.enter_async_context(stdio_client(server_params))
+        self.read_stream, self.write_stream = read_write
+        self.session = await self.exit_stack.enter_async_context(ClientSession(self.read_stream, self.write_stream))
+        
+        # Initialize the connection
+        await self.session.initialize()
+        logger.info(f"Connected to MindManager MCP server")
     
     async def disconnect(self):
         """
         Disconnect from the MCP server
         """
-        await self.client.disconnect()
+        # Close all context managers
+        await self.exit_stack.aclose()
+        self.session = None
         logger.info("Disconnected from MindManager MCP server")
     
     async def initialize(self, charttype: str = "auto", macos_access: str = "appscript") -> Dict[str, Any]:
@@ -63,7 +85,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Initialization status
         """
-        return await self.client.call_tool("initialize", {
+        return await self.session.call_tool("initialize", {
             "charttype": charttype,
             "macos_access": macos_access
         })
@@ -75,7 +97,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Version information
         """
-        return await self.client.call_tool("get_version")
+        return await self.session.call_tool("get_version")
     
     async def get_mindmap(self, mode: str = "full") -> Dict[str, Any]:
         """
@@ -87,7 +109,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Mindmap data
         """
-        return await self.client.call_tool("get_mindmap", {
+        return await self.session.call_tool("get_mindmap", {
             "mode": mode
         })
     
@@ -98,7 +120,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Central topic data
         """
-        return await self.client.call_tool("get_central_topic")
+        return await self.session.call_tool("get_central_topic")
     
     async def get_selection(self) -> Dict[str, Any]:
         """
@@ -107,7 +129,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Selected topics data
         """
-        return await self.client.call_tool("get_selection")
+        return await self.session.call_tool("get_selection")
     
     async def create_mindmap(self, mindmap_data: Dict[str, Any], charttype: str = "auto") -> Dict[str, Any]:
         """
@@ -120,7 +142,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Creation status
         """
-        return await self.client.call_tool("create_mindmap", {
+        return await self.session.call_tool("create_mindmap", {
             "mindmap_data": mindmap_data,
             "charttype": charttype
         })
@@ -136,7 +158,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Operation status with new subtopic GUID
         """
-        return await self.client.call_tool("add_subtopic", {
+        return await self.session.call_tool("add_subtopic", {
             "parent_guid": parent_guid,
             "text": text
         })
@@ -152,7 +174,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Operation status
         """
-        return await self.client.call_tool("set_topic_text", {
+        return await self.session.call_tool("set_topic_text", {
             "guid": guid,
             "text": text
         })
@@ -169,7 +191,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Operation status
         """
-        return await self.client.call_tool("add_relationship", {
+        return await self.session.call_tool("add_relationship", {
             "from_guid": from_guid,
             "to_guid": to_guid,
             "label": label
@@ -186,7 +208,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Operation status
         """
-        return await self.client.call_tool("add_tag", {
+        return await self.session.call_tool("add_tag", {
             "topic_guid": topic_guid,
             "tag_text": tag_text
         })
@@ -198,7 +220,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Library folder path
         """
-        return await self.client.call_tool("get_library_folder")
+        return await self.session.call_tool("get_library_folder")
     
     async def set_background_image(self, image_path: str) -> Dict[str, Any]:
         """
@@ -210,7 +232,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Operation status
         """
-        return await self.client.call_tool("set_background_image", {
+        return await self.session.call_tool("set_background_image", {
             "image_path": image_path
         })
     
@@ -224,7 +246,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Mermaid diagram representation
         """
-        return await self.client.call_tool("export_to_mermaid", {
+        return await self.session.call_tool("export_to_mermaid", {
             "id_only": id_only
         })
     
@@ -238,7 +260,7 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Markdown representation
         """
-        return await self.client.call_tool("export_to_markdown", {
+        return await self.session.call_tool("export_to_markdown", {
             "include_notes": include_notes
         })
     
@@ -249,56 +271,8 @@ class MindManagerClient:
         Returns:
             str: Information about MindManager
         """
-        return await self.client.read_resource("mindmanager://info")
-    
-    async def iterate_topics(self, topic_guid: str, action: str, value: str = None) -> Dict[str, Any]:
-        """
-        Perform an action on all subtopics recursively
-        
-        Args:
-            topic_guid (str): GUID of the starting topic
-            action (str): Action to perform (e.g., 'uppercase', 'lowercase', 'prefix', 'suffix')
-            value (str): Value to use for prefix/suffix actions
-            
-        Returns:
-            Dict[str, Any]: Operation status
-        """
-        if not topic_guid:
-            return {"status": "error", "message": "Topic GUID is required"}
-        
-        # Get current topic text
-        topic_result = await self.get_topic_data(topic_guid)
-        if topic_result["status"] != "success":
-            return topic_result
-        
-        # Apply the action to the current topic
-        text = topic_result.get("text", "")
-        new_text = self._apply_text_action(text, action, value)
-        
-        # Update the topic
-        update_result = await self.set_topic_text(topic_guid, new_text)
-        if update_result["status"] != "success":
-            return update_result
-        
-        # Get subtopics
-        selection_result = await self.get_selection()
-        if selection_result["status"] != "success":
-            return selection_result
-        
-        # Process each subtopic recursively
-        results = []
-        for subtopic in topic_result.get("subtopics", []):
-            subtopic_guid = subtopic.get("guid", "")
-            if subtopic_guid:
-                subtopic_result = await self.iterate_topics(subtopic_guid, action, value)
-                results.append(subtopic_result)
-        
-        return {
-            "status": "success", 
-            "topic_guid": topic_guid,
-            "text": new_text,
-            "subtopics_processed": len(results)
-        }
+        content, _ = await self.session.read_resource("mindmanager://info")
+        return content.decode("utf-8") if isinstance(content, bytes) else content
     
     async def get_topic_data(self, topic_guid: str) -> Dict[str, Any]:
         """
@@ -310,14 +284,12 @@ class MindManagerClient:
         Returns:
             Dict[str, Any]: Topic data
         """
-        # This is a simplified implementation - in a real application,
-        # we would need proper topic data retrieval
+        # Get the entire mindmap and find the topic
         mindmap_result = await self.get_mindmap(mode="full")
         if mindmap_result["status"] != "success":
             return {"status": "error", "message": "Failed to get mindmap"}
         
         # Find the topic with the matching GUID
-        # This is a simplified approach - in reality, we'd need recursive search
         mindmap = mindmap_result.get("mindmap", {})
         return self._find_topic_by_guid(mindmap, topic_guid)
     
@@ -341,6 +313,50 @@ class MindManagerClient:
                 return result
         
         return {"status": "error", "message": f"Topic with GUID {guid} not found"}
+    
+    async def iterate_topics(self, topic_guid: str, action: str, value: str = None) -> Dict[str, Any]:
+        """
+        Perform an action on all subtopics recursively
+        
+        Args:
+            topic_guid (str): GUID of the starting topic
+            action (str): Action to perform (e.g., 'uppercase', 'lowercase', 'prefix', 'suffix')
+            value (str): Value to use for prefix/suffix actions
+            
+        Returns:
+            Dict[str, Any]: Operation status
+        """
+        if not topic_guid:
+            return {"status": "error", "message": "Topic GUID is required"}
+        
+        # Get current topic text
+        topic_result = await self.get_topic_data(topic_guid)
+        if topic_result["status"] != "success":
+            return topic_result
+        
+        # Apply the action to the current topic
+        text = topic_result.get("topic", {}).get("text", "")
+        new_text = self._apply_text_action(text, action, value)
+        
+        # Update the topic
+        update_result = await self.set_topic_text(topic_guid, new_text)
+        if update_result["status"] != "success":
+            return update_result
+        
+        # Process each subtopic recursively
+        results = []
+        for subtopic in topic_result.get("topic", {}).get("subtopics", []):
+            subtopic_guid = subtopic.get("guid", "")
+            if subtopic_guid:
+                subtopic_result = await self.iterate_topics(subtopic_guid, action, value)
+                results.append(subtopic_result)
+        
+        return {
+            "status": "success", 
+            "topic_guid": topic_guid,
+            "text": new_text,
+            "subtopics_processed": len(results)
+        }
     
     def _apply_text_action(self, text: str, action: str, value: str = None) -> str:
         """
@@ -421,27 +437,26 @@ async def main():
                             if sub_result["status"] == "success":
                                 logger.info(f"  Added nested topic: {sub_result.get('text', 'unknown')}")
                         
-                        # Add relationships between nested topics
-                        nested_topics = []
+                        # Get selection after adding subtopics
                         selection_result = await client.get_selection()
                         if selection_result["status"] == "success":
                             nested_topics = selection_result.get("selection", [])
                             
-                        if len(nested_topics) >= 2:
-                            first_guid = nested_topics[0].get("guid", "")
-                            second_guid = nested_topics[1].get("guid", "")
-                            if first_guid and second_guid:
-                                rel_result = await client.add_relationship(first_guid, second_guid, "Related to")
-                                if rel_result["status"] == "success":
-                                    logger.info(f"Added relationship between topics")
-                        
-                        # Add tags to topics
-                        for i, topic in enumerate(nested_topics):
-                            topic_guid = topic.get("guid", "")
-                            if topic_guid:
-                                tag_result = await client.add_tag(topic_guid, f"Priority-{i+1}")
-                                if tag_result["status"] == "success":
-                                    logger.info(f"Added tag to topic: Priority-{i+1}")
+                            if len(nested_topics) >= 2:
+                                first_guid = nested_topics[0].get("guid", "")
+                                second_guid = nested_topics[1].get("guid", "")
+                                if first_guid and second_guid:
+                                    rel_result = await client.add_relationship(first_guid, second_guid, "Related to")
+                                    if rel_result["status"] == "success":
+                                        logger.info(f"Added relationship between topics")
+                            
+                            # Add tags to topics
+                            for i, topic in enumerate(nested_topics):
+                                topic_guid = topic.get("guid", "")
+                                if topic_guid:
+                                    tag_result = await client.add_tag(topic_guid, f"Priority-{i+1}")
+                                    if tag_result["status"] == "success":
+                                        logger.info(f"Added tag to topic: Priority-{i+1}")
         
         # Export to Mermaid format
         mermaid_result = await client.export_to_mermaid()

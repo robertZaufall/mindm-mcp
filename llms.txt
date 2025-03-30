@@ -4,8 +4,6 @@ Directory structure:
     ├── LICENSE
     ├── pyproject.toml
     ├── update_version.py
-    ├── examples/
-    │   └── client.py
     └── mindm_mcp/
         ├── __init__.py
         └── server.py
@@ -53,54 +51,29 @@ git clone https://github.com/robertZaufall/mindm-mcp.git
 cd mindm-mcp
 ```
 
+```bash
+# Install required packages
+uv run mcp dev mindm_mcp/server.py
+
+# Clone the repository (if you're using it from a repository)
+git clone https://github.com/robertZaufall/mindm-mcp.git
+cd mindm-mcp
+```
+
 ## Usage
 
 ### Starting the server
 
 ```bash
 # Using the CLI
-python server.py --host localhost --port 8000
+python server.py
 
 # Alternative: Install with the MCP CLI
-mcp install server.py
-```
+pip install 'mcp[cli]'
+mcp install mindm_mcp/server.py
 
-### Client example
-
-```python
-import asyncio
-from client import MindManagerClient
-
-async def main():
-    # Create client instance
-    client = MindManagerClient(server_url="http://localhost:8000")
-    
-    try:
-        # Connect to server
-        await client.connect()
-        
-        # Initialize connection to MindManager
-        result = await client.initialize()
-        if result["status"] == "success":
-            print("Connected to MindManager successfully!")
-            
-        # Get the central topic
-        central = await client.get_central_topic()
-        if central["status"] == "success":
-            topic = central.get("topic", {})
-            print(f"Central topic: {topic.get('text', '')}")
-            
-        # Add a subtopic
-        if topic and "guid" in topic:
-            subtopic = await client.add_subtopic(topic["guid"], "New subtopic from MCP")
-            print(f"Added subtopic with GUID: {subtopic.get('guid', '')}")
-    
-    finally:
-        # Disconnect when done
-        await client.disconnect()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+# for debugging
+mcp dev mindm_mcp/server.py
 ```
 
 ## MCP Tools
@@ -194,13 +167,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mindm_mcp"
-version = "0.0.1.11"
+version = "0.0.1.38"
 authors = [
   { name="Robert Zaufall" },
 ]
 description = "Model Context Protocol (MCP) server for the mindm library, enabling AI assistants like Claude to interact with MindManager."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -209,19 +182,14 @@ classifiers = [
 ]
 
 dependencies = [
-  "mindm>=0.0.4.1",
+  "mindm>=0.0.4.2",
   "uvicorn>=0.22.0",
   "aiohttp>=3.8.4",
   "pydantic>=1.10.7",
   "websockets>=10.4",
-]
-
-[project.optional-dependencies]
-dev = [
-  "pytest>=7.0",
-  "pytest-asyncio>=0.20.0",
-  "black",
-  "flake8",
+  "fastmcp>=0.4.1",
+  "mcp[cli]>=1.6.0",
+  "build>=1.2.2.post1",
 ]
 
 [project.urls]
@@ -266,515 +234,8 @@ else:
 
 
 ================================================
-File: examples/client.py
-================================================
-#!/usr/bin/env python3
-"""
-client.py - Example client for interacting with the mindm MCP server
-
-This module demonstrates how to use the MCP client to interact with
-the mindm server to manipulate MindManager maps programmatically.
-"""
-
-import json
-import sys
-import os
-import logging
-import asyncio
-from typing import Dict, Any, Optional, List, Union
-from contextlib import AsyncExitStack
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-try:
-    # Updated imports for current MCP SDK version
-    from mcp import ClientSession, StdioServerParameters
-    from mcp.client.stdio import stdio_client
-except ImportError:
-    print("Error: Model Context Protocol SDK is required")
-    print("Install with: pip install mcp")
-    sys.exit(1)
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("mindm-mcp-client")
-
-class MindManagerClient:
-    """
-    Client for interacting with the MindManager MCP server
-    """
-    
-    def __init__(self, server_path: str = None):
-        """
-        Initialize the MindManager client
-        
-        Args:
-            server_path (str): Path to the server script
-        """
-        self.server_path = server_path if server_path else "-m mindm_mcp.server"
-        self.session = None
-        self.exit_stack = AsyncExitStack()
-        
-    async def connect(self):
-        """
-        Connect to the MCP server
-        """
-        # Create server parameters for stdio connection
-        server_params = StdioServerParameters(
-            command="python",
-            args=[self.server_path],
-            env=None
-        )
-        
-        # Use AsyncExitStack to manage the async context managers
-        read_write = await self.exit_stack.enter_async_context(stdio_client(server_params))
-        self.read_stream, self.write_stream = read_write
-        self.session = await self.exit_stack.enter_async_context(ClientSession(self.read_stream, self.write_stream))
-        
-        # Initialize the connection
-        await self.session.initialize()
-        logger.info(f"Connected to MindManager MCP server")
-    
-    async def disconnect(self):
-        """
-        Disconnect from the MCP server
-        """
-        # Close all context managers
-        await self.exit_stack.aclose()
-        self.session = None
-        logger.info("Disconnected from MindManager MCP server")
-    
-    async def initialize(self, charttype: str = "auto", macos_access: str = "appscript") -> Dict[str, Any]:
-        """
-        Initialize the MindManager interface
-        
-        Args:
-            charttype (str): Chart type (auto, orgchart, radial)
-            macos_access (str): macOS access method (appscript, applescript)
-            
-        Returns:
-            Dict[str, Any]: Initialization status
-        """
-        return await self.session.call_tool("initialize", {
-            "charttype": charttype,
-            "macos_access": macos_access
-        })
-    
-    async def get_version(self) -> Dict[str, Any]:
-        """
-        Get the MindManager version
-        
-        Returns:
-            Dict[str, Any]: Version information
-        """
-        return await self.session.call_tool("get_version")
-    
-    async def get_mindmap(self, mode: str = "full") -> Dict[str, Any]:
-        """
-        Get the current mindmap structure
-        
-        Args:
-            mode (str): Attribute gathering mode (full, content, text)
-            
-        Returns:
-            Dict[str, Any]: Mindmap data
-        """
-        return await self.session.call_tool("get_mindmap", {
-            "mode": mode
-        })
-    
-    async def get_central_topic(self) -> Dict[str, Any]:
-        """
-        Get the central topic of the mindmap
-        
-        Returns:
-            Dict[str, Any]: Central topic data
-        """
-        return await self.session.call_tool("get_central_topic")
-    
-    async def get_selection(self) -> Dict[str, Any]:
-        """
-        Get the currently selected topics
-        
-        Returns:
-            Dict[str, Any]: Selected topics data
-        """
-        return await self.session.call_tool("get_selection")
-    
-    async def create_mindmap(self, mindmap_data: Dict[str, Any], charttype: str = "auto") -> Dict[str, Any]:
-        """
-        Create a new mindmap from the provided structure
-        
-        Args:
-            mindmap_data (Dict[str, Any]): Serialized mindmap structure
-            charttype (str): Chart type to use
-            
-        Returns:
-            Dict[str, Any]: Creation status
-        """
-        return await self.session.call_tool("create_mindmap", {
-            "mindmap_data": mindmap_data,
-            "charttype": charttype
-        })
-    
-    async def add_subtopic(self, parent_guid: str, text: str = "New Topic") -> Dict[str, Any]:
-        """
-        Add a subtopic to an existing topic
-        
-        Args:
-            parent_guid (str): GUID of the parent topic
-            text (str): Text content for the new subtopic
-            
-        Returns:
-            Dict[str, Any]: Operation status with new subtopic GUID
-        """
-        return await self.session.call_tool("add_subtopic", {
-            "parent_guid": parent_guid,
-            "text": text
-        })
-    
-    async def set_topic_text(self, guid: str, text: str) -> Dict[str, Any]:
-        """
-        Set the text content of a topic
-        
-        Args:
-            guid (str): GUID of the topic to update
-            text (str): New text content
-            
-        Returns:
-            Dict[str, Any]: Operation status
-        """
-        return await self.session.call_tool("set_topic_text", {
-            "guid": guid,
-            "text": text
-        })
-    
-    async def add_relationship(self, from_guid: str, to_guid: str, label: str = "") -> Dict[str, Any]:
-        """
-        Add a relationship between two topics
-        
-        Args:
-            from_guid (str): GUID of the source topic
-            to_guid (str): GUID of the target topic
-            label (str): Label for the relationship
-            
-        Returns:
-            Dict[str, Any]: Operation status
-        """
-        return await self.session.call_tool("add_relationship", {
-            "from_guid": from_guid,
-            "to_guid": to_guid,
-            "label": label
-        })
-    
-    async def add_tag(self, topic_guid: str, tag_text: str) -> Dict[str, Any]:
-        """
-        Add a tag to a topic
-        
-        Args:
-            topic_guid (str): GUID of the topic
-            tag_text (str): Text of the tag
-            
-        Returns:
-            Dict[str, Any]: Operation status
-        """
-        return await self.session.call_tool("add_tag", {
-            "topic_guid": topic_guid,
-            "tag_text": tag_text
-        })
-    
-    async def get_library_folder(self) -> Dict[str, Any]:
-        """
-        Get the MindManager library folder
-        
-        Returns:
-            Dict[str, Any]: Library folder path
-        """
-        return await self.session.call_tool("get_library_folder")
-    
-    async def set_background_image(self, image_path: str) -> Dict[str, Any]:
-        """
-        Set the background image for the current document
-        
-        Args:
-            image_path (str): Path to the image file
-            
-        Returns:
-            Dict[str, Any]: Operation status
-        """
-        return await self.session.call_tool("set_background_image", {
-            "image_path": image_path
-        })
-    
-    async def export_to_mermaid(self, id_only: bool = False) -> Dict[str, Any]:
-        """
-        Export the current mindmap to Mermaid format
-        
-        Args:
-            id_only (bool): If True, export with ID references only
-            
-        Returns:
-            Dict[str, Any]: Mermaid diagram representation
-        """
-        return await self.session.call_tool("export_to_mermaid", {
-            "id_only": id_only
-        })
-    
-    async def export_to_markdown(self, include_notes: bool = True) -> Dict[str, Any]:
-        """
-        Export the current mindmap to Markdown format
-        
-        Args:
-            include_notes (bool): If True, include notes
-            
-        Returns:
-            Dict[str, Any]: Markdown representation
-        """
-        return await self.session.call_tool("export_to_markdown", {
-            "include_notes": include_notes
-        })
-    
-    async def get_mindmanager_info(self) -> str:
-        """
-        Get information about the MindManager application
-        
-        Returns:
-            str: Information about MindManager
-        """
-        content, _ = await self.session.read_resource("mindmanager://info")
-        return content.decode("utf-8") if isinstance(content, bytes) else content
-    
-    async def get_topic_data(self, topic_guid: str) -> Dict[str, Any]:
-        """
-        Get data for a specific topic by GUID
-        
-        Args:
-            topic_guid (str): GUID of the topic
-            
-        Returns:
-            Dict[str, Any]: Topic data
-        """
-        # Get the entire mindmap and find the topic
-        mindmap_result = await self.get_mindmap(mode="full")
-        if mindmap_result["status"] != "success":
-            return {"status": "error", "message": "Failed to get mindmap"}
-        
-        # Find the topic with the matching GUID
-        mindmap = mindmap_result.get("mindmap", {})
-        return self._find_topic_by_guid(mindmap, topic_guid)
-    
-    def _find_topic_by_guid(self, topic_data: Dict[str, Any], guid: str) -> Dict[str, Any]:
-        """
-        Recursively find a topic by GUID in the mindmap structure
-        
-        Args:
-            topic_data (Dict[str, Any]): Current topic data
-            guid (str): GUID to find
-            
-        Returns:
-            Dict[str, Any]: Found topic data or error
-        """
-        if topic_data.get("guid", "") == guid:
-            return {"status": "success", "topic": topic_data}
-        
-        for subtopic in topic_data.get("subtopics", []):
-            result = self._find_topic_by_guid(subtopic, guid)
-            if result["status"] == "success":
-                return result
-        
-        return {"status": "error", "message": f"Topic with GUID {guid} not found"}
-    
-    async def iterate_topics(self, topic_guid: str, action: str, value: str = None) -> Dict[str, Any]:
-        """
-        Perform an action on all subtopics recursively
-        
-        Args:
-            topic_guid (str): GUID of the starting topic
-            action (str): Action to perform (e.g., 'uppercase', 'lowercase', 'prefix', 'suffix')
-            value (str): Value to use for prefix/suffix actions
-            
-        Returns:
-            Dict[str, Any]: Operation status
-        """
-        if not topic_guid:
-            return {"status": "error", "message": "Topic GUID is required"}
-        
-        # Get current topic text
-        topic_result = await self.get_topic_data(topic_guid)
-        if topic_result["status"] != "success":
-            return topic_result
-        
-        # Apply the action to the current topic
-        text = topic_result.get("topic", {}).get("text", "")
-        new_text = self._apply_text_action(text, action, value)
-        
-        # Update the topic
-        update_result = await self.set_topic_text(topic_guid, new_text)
-        if update_result["status"] != "success":
-            return update_result
-        
-        # Process each subtopic recursively
-        results = []
-        for subtopic in topic_result.get("topic", {}).get("subtopics", []):
-            subtopic_guid = subtopic.get("guid", "")
-            if subtopic_guid:
-                subtopic_result = await self.iterate_topics(subtopic_guid, action, value)
-                results.append(subtopic_result)
-        
-        return {
-            "status": "success", 
-            "topic_guid": topic_guid,
-            "text": new_text,
-            "subtopics_processed": len(results)
-        }
-    
-    def _apply_text_action(self, text: str, action: str, value: str = None) -> str:
-        """
-        Apply a text transformation action
-        
-        Args:
-            text (str): Original text
-            action (str): Action to apply
-            value (str): Optional value for some actions
-            
-        Returns:
-            str: Transformed text
-        """
-        if action == "uppercase":
-            return text.upper()
-        elif action == "lowercase":
-            return text.lower()
-        elif action == "capitalize":
-            return text.capitalize()
-        elif action == "title":
-            return text.title()
-        elif action == "prefix" and value:
-            return f"{value}{text}"
-        elif action == "suffix" and value:
-            return f"{text}{value}"
-        elif action == "replace" and value and "," in value:
-            old, new = value.split(",", 1)
-            return text.replace(old, new)
-        else:
-            return text  # No change if action not recognized
-
-
-async def main():
-    """
-    Main function demonstrating client usage
-    """
-    client = MindManagerClient()
-    
-    try:
-        # Connect to the MCP server
-        await client.connect()
-        
-        # Initialize the connection to MindManager
-        init_result = await client.initialize()
-        if init_result["status"] != "success" and init_result["status"] != "warning":
-            logger.error(f"Failed to initialize MindManager: {init_result.get('message', 'Unknown error')}")
-            return
-        
-        logger.info(f"Connected to MindManager on {init_result.get('platform', 'unknown')} platform")
-        
-        # Get MindManager info from resource
-        info = await client.get_mindmanager_info()
-        logger.info(f"MindManager Info:\n{info}")
-        
-        # Get the version
-        version_result = await client.get_version()
-        if version_result["status"] == "success":
-            logger.info(f"MindManager version: {version_result.get('version', 'unknown')}")
-        
-        # Get the central topic
-        central_result = await client.get_central_topic()
-        if central_result["status"] == "success":
-            central_topic = central_result.get("topic", {})
-            logger.info(f"Central topic: {central_topic.get('text', 'No text')}")
-        
-            # Add a subtopic to the central topic
-            central_guid = central_topic.get("guid", "")
-            if central_guid:
-                subtopic_result = await client.add_subtopic(central_guid, "New MCP Subtopic")
-                if subtopic_result["status"] == "success":
-                    logger.info(f"Added subtopic: {subtopic_result.get('text', 'unknown')}")
-                    subtopic_guid = subtopic_result.get("guid", "")
-                    
-                    # Add another level of subtopics
-                    if subtopic_guid:
-                        for i in range(3):
-                            sub_result = await client.add_subtopic(subtopic_guid, f"Nested Topic {i+1}")
-                            if sub_result["status"] == "success":
-                                logger.info(f"  Added nested topic: {sub_result.get('text', 'unknown')}")
-                        
-                        # Get selection after adding subtopics
-                        selection_result = await client.get_selection()
-                        if selection_result["status"] == "success":
-                            nested_topics = selection_result.get("selection", [])
-                            
-                            if len(nested_topics) >= 2:
-                                first_guid = nested_topics[0].get("guid", "")
-                                second_guid = nested_topics[1].get("guid", "")
-                                if first_guid and second_guid:
-                                    rel_result = await client.add_relationship(first_guid, second_guid, "Related to")
-                                    if rel_result["status"] == "success":
-                                        logger.info(f"Added relationship between topics")
-                            
-                            # Add tags to topics
-                            for i, topic in enumerate(nested_topics):
-                                topic_guid = topic.get("guid", "")
-                                if topic_guid:
-                                    tag_result = await client.add_tag(topic_guid, f"Priority-{i+1}")
-                                    if tag_result["status"] == "success":
-                                        logger.info(f"Added tag to topic: Priority-{i+1}")
-        
-        # Export to Mermaid format
-        mermaid_result = await client.export_to_mermaid()
-        if mermaid_result["status"] == "success":
-            mermaid_content = mermaid_result.get("mermaid", "")
-            preview_length = min(len(mermaid_content), 200)
-            logger.info(f"Mermaid Diagram Preview:\n{mermaid_content[:preview_length]}...")
-        
-        # Export to Markdown format
-        markdown_result = await client.export_to_markdown()
-        if markdown_result["status"] == "success":
-            markdown_content = markdown_result.get("markdown", "")
-            preview_length = min(len(markdown_content), 200)
-            logger.info(f"Markdown Content Preview:\n{markdown_content[:preview_length]}...")
-        
-        # Demonstrate topic text transformation
-        if central_guid:
-            transform_result = await client.iterate_topics(central_guid, "uppercase")
-            if transform_result["status"] == "success":
-                logger.info(f"Transformed topics to uppercase: {transform_result.get('subtopics_processed', 0)} subtopics processed")
-        
-        logger.info("Client example completed successfully")
-    
-    except Exception as e:
-        logger.error(f"Error in client example: {str(e)}")
-    
-    finally:
-        # Disconnect from the server
-        await client.disconnect()
-
-
-if __name__ == "__main__":
-    try:
-        # Run the main function
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Client example interrupted by user")
-
-
-================================================
 File: mindm_mcp/__init__.py
 ================================================
-# Version information
-try:
-    from importlib.metadata import version as _version
-    __version__ = _version("mindm")
-except ImportError:
-    __version__ = "unknown"
 
 
 
@@ -789,717 +250,686 @@ This module implements a Model Context Protocol (MCP) server
 for interacting with MindManager through the mindm library using FastMCP.
 """
 
-import json
-import os
 import sys
-import logging
 from typing import Dict, Any, List, Optional, Union
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+import asyncio
+import json
+from mcp.server.fastmcp import FastMCP, Context
+
+from mindmap.mindmap import MindmapDocument, MindmapTopic
+from mindmap import serialization, helpers
 
 try:
-    from mcp.server.fastmcp import FastMCP, Context
+    from importlib.metadata import version as _version
+    __version__ = _version("mindm_mcp")
 except ImportError:
-    print("Error: Model Context Protocol SDK is required")
-    print("Install with: pip install mcp")
-    sys.exit(1)
+    __version__ = "unknown"
 
-import mindm.mindmanager as mm
-import mindmap.mindmap as mindmap
-import mindmap.serialization as serialization
-from mindmap.mindmap import MindmapTopic, MindmapLink, MindmapNotes, MindmapTag, MindmapReference, MindmapImage, MindmapIcon
+# --- Globals ---
+# Initialize the MCP server
+mcp = FastMCP("mindm (MindManager)", version=__version__)
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("mindm-mcp")
+MACOS_ACCESS_METHOD = 'applescript' # appscript is not working with MCPs
 
-@dataclass
-class AppContext:
-    """Application context for the MindManager MCP server"""
-    mindmanager: Optional[mm.Mindmanager] = None
-    platform: Optional[str] = None
-    document: Optional[Any] = None
-    charttype: str = "auto"
-    macos_access: str = "appplescript"
+# Global instance of MindmapDocument to interact with MindManager
+# We initialize it lazily to allow configuration if needed later
+mindmap_doc_instance: Optional[MindmapDocument] = None
+doc_lock = asyncio.Lock()
 
-@asynccontextmanager
-async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
-    """
-    Manage application lifecycle with context
-    
-    Args:
-        server: The FastMCP server instance
-        
-    Yields:
-        AppContext: Application context for the server
-    """
-    # Initialize on startup
-    context = AppContext()
-    logger.info("MindManager MCP server starting")
-    
-    try:
-        yield context
-    finally:
-        # Cleanup on shutdown
-        if context.mindmanager is not None:
-            # Note: This is a simplified cleanup since Mindmanager in mindm
-            # doesn't have a specific shutdown method
-            context.mindmanager = None
-            logger.info("MindManager MCP server shutting down")
+# --- Helper Functions ---
 
-# Create the MCP server
-mcp = FastMCP(
-    "MindManager",
-    description="MindManager Model Context Protocol server for Windows and macOS",
-    lifespan=app_lifespan
-)
+async def _get_doc_instance(
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD
+) -> MindmapDocument:
+    """Lazily initializes and returns the MindmapDocument instance."""
+    global mindmap_doc_instance
+    async with doc_lock:
+        if mindmap_doc_instance is None:
+            print(f"Initializing MindmapDocument (charttype={charttype}, turbo={turbo_mode}, macos={macos_access})", file=sys.stderr)
+            # Add error handling for MindManager initialization if necessary
+            try:
+                mindmap_doc_instance = MindmapDocument(
+                    charttype=charttype,
+                    turbo_mode=turbo_mode,
+                    macos_access=macos_access
+                )
+                # Optional: Check if a document is open upon initialization?
+                # if not mindmap_doc_instance.mindm.document_exists():
+                #     print("Warning: MindManager document not detected during initialization.", file=sys.stderr)
+            except Exception as e:
+                print(f"ERROR: Failed to initialize MindmapDocument: {e}", file=sys.stderr)
+                raise  # Re-raise to signal failure
+        # Update modes if needed? For now, we re-initialize if settings change,
+        # but a better approach might be methods on MindmapDocument to change settings.
+        elif (mindmap_doc_instance.charttype != charttype or
+              mindmap_doc_instance.turbo_mode != turbo_mode or
+              mindmap_doc_instance.macos_access != macos_access):
+              print(f"Re-initializing MindmapDocument due to changed settings (charttype={charttype}, turbo={turbo_mode}, macos={macos_access})", file=sys.stderr)
+              try:
+                  mindmap_doc_instance = MindmapDocument(
+                        charttype=charttype,
+                        turbo_mode=turbo_mode,
+                        macos_access=macos_access
+                    )
+              except Exception as e:
+                print(f"ERROR: Failed to re-initialize MindmapDocument: {e}", file=sys.stderr)
+                raise # Re-raise to signal failure
 
-@mcp.tool()
-async def initialize(
-    charttype: str = "auto", 
-    macos_access: str = "applescript",
-    ctx: Context[AppContext, Any] = None
-) -> Dict[str, Any]:
-    """
-    Initialize the MindManager interface
-    
-    Args:
-        charttype: Chart type (auto, orgchart, radial)
-        macos_access: macOS access method (appscript, applescript)
-        ctx: MCP context
-        
-    Returns:
-        Dict[str, Any]: Initialization status with platform information
-    """
-    try:
-        # Initialize MindManager
-        ctx.app.charttype = charttype
-        ctx.app.macos_access = macos_access
-        
-        ctx.app.mindmanager = mm.Mindmanager(charttype, macos_access)
-        ctx.app.platform = ctx.app.mindmanager.platform
-        
-        if ctx.app.mindmanager.document_exists():
-            ctx.app.document = ctx.app.mindmanager.get_active_document_object()
-            logger.info(f"Initialized MindManager on {ctx.app.platform} platform")
-            return {"status": "success", "platform": ctx.app.platform}
-        else:
-            logger.warning("No MindManager document is open")
-            return {"status": "warning", "message": "No document is open", "platform": ctx.app.platform}
-                
-    except Exception as e:
-        logger.error(f"Error initializing MindManager: {str(e)}")
-        return {"status": "error", "message": str(e)}
+    return mindmap_doc_instance
 
-@mcp.tool()
-async def get_version(ctx: Context[AppContext, Any] = None) -> Dict[str, Any]:
-    """
-    Get the MindManager version
-    
-    Args:
-        ctx: MCP context
-        
-    Returns:
-        Dict[str, Any]: Version information
-    """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
-    try:
-        version = ctx.app.mindmanager.get_version()
-        return {"status": "success", "version": version}
-    except Exception as e:
-        logger.error(f"Error getting version: {str(e)}")
-        return {"status": "error", "message": str(e)}
+def _serialize_result(data: Any) -> Union[Dict, List, str, int, float, bool, None]:
+    """Helper to serialize results, especially MindmapTopic structures."""
+    if isinstance(data, (MindmapTopic, list)):
+         # Use simple serialization for MCP results unless full detail is needed
+        return serialization.serialize_object_simple(data)
+    elif isinstance(data, tuple):
+        # Tuples are often JSON serializable directly if elements are
+        return list(data) # Convert to list for guaranteed JSON compatibility
+    elif isinstance(data, (dict, str, int, float, bool, type(None))):
+        return data
+    else:
+        # Attempt string conversion for unknown types
+        print(f"Warning: Serializing unknown type {type(data)} as string.", file=sys.stderr)
+        return str(data)
+
+def _handle_mindmanager_error(func_name: str, e: Exception) -> Dict[str, str]:
+    """Formats MindManager errors for MCP response."""
+    error_message = f"Error during MindManager operation '{func_name}': {e}"
+    print(f"ERROR: {error_message}", file=sys.stderr)
+    # Check for specific known errors from mindm.mindmanager if possible
+    if "No document found" in str(e):
+        return {"error": "MindManager Error", "message": "No document found or MindManager not running."}
+    # Add more specific error checks here based on mindm library
+    return {"error": "MindManager Error", "message": f"An error occurred: {e}"}
+
+# --- MCP Tools ---
+
+# == MindmapDocument Methods ==
 
 @mcp.tool()
 async def get_mindmap(
-    mode: str = "full",
-    ctx: Context[AppContext, Any] = None
+    mode: str = 'full',
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD
 ) -> Dict[str, Any]:
     """
-    Get the current mindmap structure
-    
-    Args:
-        mode: Attribute gathering mode (full, content, text)
-        ctx: MCP context
-        
-    Returns:
-        Dict[str, Any]: Mindmap data
-    """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
-    if not ctx.app.mindmanager.document_exists():
-        return {"status": "error", "message": "No document is open"}
-    
-    try:
-        # Create MindmapDocument instance
-        doc = mindmap.MindmapDocument(
-            charttype=ctx.app.charttype, 
-            macos_access=ctx.app.macos_access if ctx.app.platform == "darwin" else None
-        )
-        
-        # Get the mindmap
-        result = doc.get_mindmap(mode=mode)
-        if not result:
-            return {"status": "error", "message": "Failed to get mindmap"}
-        
-        # Serialize mindmap
-        guid_mapping = {}
-        serialization.build_mapping(doc.mindmap, guid_mapping)
-        serialized = serialization.serialize_object_simple(doc.mindmap)
-        
-        return {
-            "status": "success", 
-            "mindmap": serialized,
-            "max_topic_level": doc.max_topic_level
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting mindmap: {str(e)}")
-        return {"status": "error", "message": str(e)}
+    Retrieves the current mind map structure from MindManager.
 
-@mcp.tool()
-async def get_central_topic(ctx: Context[AppContext, Any] = None) -> Dict[str, Any]:
-    """
-    Get the central topic of the mindmap
-    
     Args:
-        ctx: MCP context
-        
+        mode (str): Detail level ('full', 'content', 'text'). Defaults to 'full'.
+        charttype (str): Chart type ('orgchart', 'radial', 'auto'). Defaults to 'auto'.
+        turbo_mode (bool): Enable turbo mode (text only). Defaults to False.
+        macos_access (str): Access method on macOS ('appscript', 'applescript'). Defaults to 'appscript'.
+
     Returns:
-        Dict[str, Any]: Central topic data
+        Dict[str, Any]: Serialized mind map structure or error dictionary.
     """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
     try:
-        central_topic = ctx.app.mindmanager.get_central_topic()
-        if central_topic:
-            serialized = serialization.serialize_object_simple(central_topic)
-            return {"status": "success", "topic": serialized}
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        print(f"Calling doc.get_mindmap(mode={mode})", file=sys.stderr)
+        success = await asyncio.to_thread(doc.get_mindmap, mode=mode) # Run sync MindManager code in thread
+        if success and doc.mindmap:
+            print("get_mindmap successful, returning serialized mindmap.", file=sys.stderr)
+            return _serialize_result(doc.mindmap)
+        elif not success:
+             print("ERROR: doc.get_mindmap returned False.", file=sys.stderr)
+             return {"error": "MindManager Error", "message": "Failed to retrieve mindmap. Is a document open?"}
         else:
-            return {"status": "error", "message": "Could not get central topic"}
+             print("ERROR: doc.get_mindmap succeeded but doc.mindmap is empty.", file=sys.stderr)
+             return {"error": "MindManager Error", "message": "Mindmap data is empty after retrieval."}
     except Exception as e:
-        logger.error(f"Error getting central topic: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        return _handle_mindmanager_error("get_mindmap", e)
 
 @mcp.tool()
-async def get_selection(ctx: Context[AppContext, Any] = None) -> Dict[str, Any]:
+async def get_selection(
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD
+) -> Union[List[Dict[str, Any]], Dict[str, str]]:
     """
-    Get the currently selected topics
-    
+    Retrieves the currently selected topics in MindManager.
+
     Args:
-        ctx: MCP context
-        
+        charttype (str): Chart type ('orgchart', 'radial', 'auto'). Defaults to 'auto'.
+        turbo_mode (bool): Enable turbo mode (text only). Defaults to False.
+        macos_access (str): Access method on macOS ('appscript', 'applescript'). Defaults to 'appscript'.
+
     Returns:
-        Dict[str, Any]: Selected topics data
+        Union[List[Dict[str, Any]], Dict[str, str]]: List of serialized selected topics or error dictionary.
     """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
     try:
-        selection = ctx.app.mindmanager.get_selection()
-        
-        if not selection:
-            return {"status": "success", "selection": []}
-        
-        selected_topics = []
-        for topic in selection:
-            topic_data = {
-                "guid": ctx.app.mindmanager.get_guid_from_topic(topic),
-                "text": ctx.app.mindmanager.get_text_from_topic(topic),
-                "level": ctx.app.mindmanager.get_level_from_topic(topic)
-            }
-            selected_topics.append(topic_data)
-            
-        return {"status": "success", "selection": selected_topics}
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        print("Calling doc.get_selection()", file=sys.stderr)
+        selection = await asyncio.to_thread(doc.get_selection) # Run sync MindManager code in thread
+        print("get_selection successful, returning serialized selection.", file=sys.stderr)
+        return _serialize_result(selection)
     except Exception as e:
-        logger.error(f"Error getting selection: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        return _handle_mindmanager_error("get_selection", e)
 
 @mcp.tool()
-async def create_mindmap(
-    mindmap_data: Dict[str, Any],
-    charttype: str = "auto",
-    ctx: Context[AppContext, Any] = None
+async def create_mindmap_from_mermaid_full(
+    mermaid_text: str,
+    guid_mapping_json: str, # Pass mapping as JSON string
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD,
+    finalize: bool = True
 ) -> Dict[str, Any]:
     """
-    Create a new mindmap from the provided structure
-    
+    Creates a new MindManager mindmap from full Mermaid text with metadata.
+
     Args:
-        mindmap_data: Serialized mindmap structure
-        charttype: Chart type to use
-        ctx: MCP context
-        
+        mermaid_text (str): Mermaid string with JSON metadata comments.
+        guid_mapping_json (str): JSON string representing the ID to GUID mapping.
+        charttype (str): Chart type ('orgchart', 'radial', 'auto'). Defaults to 'auto'.
+        turbo_mode (bool): Enable turbo mode (text only). Defaults to False.
+        macos_access (str): Access method on macOS ('appscript', 'applescript'). Defaults to 'appscript'.
+        finalize (bool): Whether to finalize the map layout after creation. Defaults to True.
+
+
     Returns:
-        Dict[str, Any]: Creation status
+        Dict[str, Any]: Success message or error dictionary.
     """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
     try:
-        if not mindmap_data:
-            return {"status": "error", "message": "No mindmap data provided"}
-        
-        # Convert serialized data back to a MindmapTopic structure
-        central_topic = MindmapTopic(
-            text=mindmap_data.get("text", "New Mindmap"),
-            guid=mindmap_data.get("guid", "")
-        )
-        
-        # Process subtopics recursively
-        def process_subtopics(parent_topic, subtopics_data):
-            if not subtopics_data:
-                return
-            
-            for subtopic_data in subtopics_data:
-                subtopic = MindmapTopic(
-                    text=subtopic_data.get("text", ""),
-                    guid=subtopic_data.get("guid", ""),
-                    parent=parent_topic
-                )
-                
-                if "notes" in subtopic_data:
-                    notes_data = subtopic_data["notes"]
-                    subtopic.notes = MindmapNotes(
-                        text=notes_data.get("text", ""),
-                        xhtml=notes_data.get("xhtml", ""),
-                        rtf=notes_data.get("rtf", "")
-                    )
-                
-                # Add tags
-                if "tags" in subtopic_data:
-                    for tag_text in subtopic_data["tags"]:
-                        subtopic.tags.append(MindmapTag(text=tag_text))
-                
-                # Process links
-                if "links" in subtopic_data:
-                    for link_data in subtopic_data["links"]:
-                        subtopic.links.append(MindmapLink(
-                            text=link_data.get("text", ""),
-                            url=link_data.get("url", ""),
-                            guid=link_data.get("guid", "")
-                        ))
-                
-                # Process references
-                if "references" in subtopic_data:
-                    for ref_data in subtopic_data["references"]:
-                        subtopic.references.append(MindmapReference(
-                            guid_1=ref_data.get("guid_1", ""),
-                            guid_2=ref_data.get("guid_2", ""),
-                            direction=ref_data.get("direction", 1),
-                            label=ref_data.get("label", "")
-                        ))
-                
-                parent_topic.subtopics.append(subtopic)
-                
-                # Process nested subtopics
-                if "subtopics" in subtopic_data:
-                    process_subtopics(subtopic, subtopic_data["subtopics"])
-        
-        # Process main subtopics
-        if "subtopics" in mindmap_data:
-            process_subtopics(central_topic, mindmap_data["subtopics"])
-        
-        # Create document and mindmap
-        doc = mindmap.MindmapDocument(charttype=charttype)
-        doc.mindmap = central_topic
-        doc.create_mindmap()
-        
-        return {"status": "success", "message": "Mindmap created successfully"}
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        guid_mapping_dict = {}
+        try:
+            guid_mapping_dict = json.loads(guid_mapping_json)
+            print(f"Parsed guid_mapping_json (length: {len(guid_mapping_dict)})", file=sys.stderr)
+            # Ensure keys are strings and values are ints if needed by deserializer,
+            # but build_mapping uses guid->int, deserialize needs int->guid
+            # guid_mapping_dict = {k: int(v) for k, v in guid_mapping_dict.items()} # Keep mapping as is for deserializer
+        except json.JSONDecodeError as json_e:
+            print(f"ERROR: Invalid JSON provided for guid_mapping_json: {json_e}", file=sys.stderr)
+            return {"error": "Input Error", "message": f"Invalid JSON provided for guid_mapping_json: {json_e}"}
+        except ValueError as val_e:
+            print(f"ERROR: Invalid value in guid_mapping_json (expected int for ID): {val_e}", file=sys.stderr)
+            return {"error": "Input Error", "message": f"Invalid value in guid_mapping_json (expected int for ID): {val_e}"}
+
+
+        # Deserialize mermaid text to internal MindmapTopic structure
+        print("Deserializing Mermaid full text...", file=sys.stderr)
+        root_topic = serialization.deserialize_mermaid_full(mermaid_text, guid_mapping_dict) # uses guid->id mapping internally now
+
+        if not root_topic:
+            print("ERROR: Failed to deserialize Mermaid text.", file=sys.stderr)
+            return {"error": "Deserialization Error", "message": "Failed to deserialize Mermaid text."}
+
+        # Set the deserialized structure as the one to be created
+        doc.mindmap = root_topic
+        print("Deserialization successful, mindmap structure set.", file=sys.stderr)
+
+        # Create the mindmap in MindManager
+        print("Calling doc.create_mindmap()", file=sys.stderr)
+        await asyncio.to_thread(doc.create_mindmap) # Run sync MindManager code in thread
+        print("doc.create_mindmap() completed.", file=sys.stderr)
+
+        if finalize:
+             print("Calling doc.finalize()", file=sys.stderr)
+             await asyncio.to_thread(doc.finalize) # Run sync MindManager code in thread
+             print("doc.finalize() completed.", file=sys.stderr)
+
+        print("create_mindmap_from_mermaid_full successful.", file=sys.stderr)
+        return {"status": "success", "message": "Mindmap created successfully."}
     except Exception as e:
-        logger.error(f"Error creating mindmap: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        return _handle_mindmanager_error("create_mindmap_from_mermaid_full", e)
 
 @mcp.tool()
-async def add_subtopic(
-    parent_guid: str,
-    text: str = "New Topic",
-    ctx: Context[AppContext, Any] = None
+async def create_mindmap_from_mermaid_id(
+    mermaid_text: str,
+    guid_mapping_json: str, # Pass mapping as JSON string
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD,
+    finalize: bool = True
 ) -> Dict[str, Any]:
     """
-    Add a subtopic to an existing topic
-    
+    Creates a new MindManager mindmap from Mermaid text with only IDs.
+
     Args:
-        parent_guid: GUID of the parent topic
-        text: Text content for the new subtopic
-        ctx: MCP context
-        
+        mermaid_text (str): Mermaid string with 'id<number>[Text]' format nodes.
+        guid_mapping_json (str): JSON string representing the ID to GUID mapping.
+        charttype (str): Chart type ('orgchart', 'radial', 'auto'). Defaults to 'auto'.
+        turbo_mode (bool): Enable turbo mode (text only). Defaults to False.
+        macos_access (str): Access method on macOS ('appscript', 'applescript'). Defaults to 'appscript'.
+        finalize (bool): Whether to finalize the map layout after creation. Defaults to True.
+
     Returns:
-        Dict[str, Any]: Operation status with new subtopic GUID
+        Dict[str, Any]: Success message or error dictionary.
     """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
     try:
-        if not parent_guid:
-            return {"status": "error", "message": "Parent GUID is required"}
-        
-        # Get the parent topic
-        parent = ctx.app.mindmanager.get_topic_by_id(parent_guid)
-        if not parent:
-            return {"status": "error", "message": "Parent topic not found"}
-        
-        # Add the subtopic
-        subtopic = ctx.app.mindmanager.add_subtopic_to_topic(parent, text)
-        if not subtopic:
-            return {"status": "error", "message": "Failed to create subtopic"}
-        
-        subtopic_guid = ctx.app.mindmanager.get_guid_from_topic(subtopic)
-        
-        return {
-            "status": "success",
-            "guid": subtopic_guid,
-            "text": text
-        }
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        guid_mapping_dict = {}
+        try:
+            guid_mapping_dict = json.loads(guid_mapping_json)
+            print(f"Parsed guid_mapping_json (length: {len(guid_mapping_dict)})", file=sys.stderr)
+            # guid_mapping_dict = {k: int(v) for k, v in guid_mapping_dict.items()} # Keep mapping as is
+        except json.JSONDecodeError as json_e:
+            print(f"ERROR: Invalid JSON provided for guid_mapping_json: {json_e}", file=sys.stderr)
+            return {"error": "Input Error", "message": f"Invalid JSON provided for guid_mapping_json: {json_e}"}
+        except ValueError as val_e:
+            print(f"ERROR: Invalid value in guid_mapping_json (expected int for ID): {val_e}", file=sys.stderr)
+            return {"error": "Input Error", "message": f"Invalid value in guid_mapping_json (expected int for ID): {val_e}"}
+
+        # Deserialize mermaid text to internal MindmapTopic structure
+        print("Deserializing Mermaid ID text...", file=sys.stderr)
+        root_topic = serialization.deserialize_mermaid_with_id(mermaid_text, guid_mapping_dict)
+
+        if not root_topic:
+            print("ERROR: Failed to deserialize Mermaid ID text.", file=sys.stderr)
+            return {"error": "Deserialization Error", "message": "Failed to deserialize Mermaid text."}
+
+        # Set the deserialized structure as the one to be created
+        doc.mindmap = root_topic
+        print("Deserialization successful, mindmap structure set.", file=sys.stderr)
+
+        # Create the mindmap in MindManager
+        print("Calling doc.create_mindmap()", file=sys.stderr)
+        await asyncio.to_thread(doc.create_mindmap) # Run sync MindManager code in thread
+        print("doc.create_mindmap() completed.", file=sys.stderr)
+
+        if finalize:
+            print("Calling doc.finalize()", file=sys.stderr)
+            await asyncio.to_thread(doc.finalize) # Run sync MindManager code in thread
+            print("doc.finalize() completed.", file=sys.stderr)
+
+        print("create_mindmap_from_mermaid_id successful.", file=sys.stderr)
+        return {"status": "success", "message": "Mindmap created successfully from ID-only Mermaid."}
     except Exception as e:
-        logger.error(f"Error adding subtopic: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        return _handle_mindmanager_error("create_mindmap_from_mermaid_id", e)
 
 @mcp.tool()
-async def set_topic_text(
-    guid: str,
-    text: str,
-    ctx: Context[AppContext, Any] = None
+async def finalize_document(
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD
 ) -> Dict[str, Any]:
     """
-    Set the text content of a topic
-    
-    Args:
-        guid: GUID of the topic to update
-        text: New text content
-        ctx: MCP context
-        
-    Returns:
-        Dict[str, Any]: Operation status
-    """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
-    try:
-        if not guid:
-            return {"status": "error", "message": "Topic GUID is required"}
-        
-        # Get the topic
-        topic = ctx.app.mindmanager.get_topic_by_id(guid)
-        if not topic:
-            return {"status": "error", "message": "Topic not found"}
-        
-        # Update the text
-        ctx.app.mindmanager.set_text_to_topic(topic, text)
-        
-        return {
-            "status": "success",
-            "guid": guid,
-            "text": text
-        }
-    except Exception as e:
-        logger.error(f"Error setting topic text: {str(e)}")
-        return {"status": "error", "message": str(e)}
+    Finalizes the layout of the current MindManager document.
 
-@mcp.tool()
-async def add_relationship(
-    from_guid: str,
-    to_guid: str,
-    label: str = "",
-    ctx: Context[AppContext, Any] = None
-) -> Dict[str, Any]:
-    """
-    Add a relationship between two topics
-    
     Args:
-        from_guid: GUID of the source topic
-        to_guid: GUID of the target topic
-        label: Label for the relationship
-        ctx: MCP context
-        
-    Returns:
-        Dict[str, Any]: Operation status
-    """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
-    try:
-        if not from_guid or not to_guid:
-            return {"status": "error", "message": "Source and target GUIDs are required"}
-        
-        # Add the relationship
-        ctx.app.mindmanager.add_relationship(from_guid, to_guid, label)
-        
-        return {
-            "status": "success",
-            "from_guid": from_guid,
-            "to_guid": to_guid,
-            "label": label
-        }
-    except Exception as e:
-        logger.error(f"Error adding relationship: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        charttype (str): Chart type ('orgchart', 'radial', 'auto'). Defaults to 'auto'.
+        turbo_mode (bool): Enable turbo mode (text only). Defaults to False.
+        macos_access (str): Access method on macOS ('appscript', 'applescript'). Defaults to 'appscript'.
 
-@mcp.tool()
-async def add_tag(
-    topic_guid: str,
-    tag_text: str,
-    ctx: Context[AppContext, Any] = None
-) -> Dict[str, Any]:
-    """
-    Add a tag to a topic
-    
-    Args:
-        topic_guid: GUID of the topic
-        tag_text: Text of the tag
-        ctx: MCP context
-        
     Returns:
-        Dict[str, Any]: Operation status
+        Dict[str, Any]: Success message or error dictionary.
     """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
     try:
-        if not topic_guid:
-            return {"status": "error", "message": "Topic GUID is required"}
-        
-        if not tag_text:
-            return {"status": "error", "message": "Tag text is required"}
-        
-        # Add the tag
-        ctx.app.mindmanager.add_tag_to_topic(topic=None, tag_text=tag_text, topic_guid=topic_guid)
-        
-        return {
-            "status": "success",
-            "topic_guid": topic_guid,
-            "tag_text": tag_text
-        }
-    except Exception as e:
-        logger.error(f"Error adding tag: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        if not doc.mindmap:
+             print("finalize_document: mindmap not loaded, calling get_mindmap first.", file=sys.stderr)
+             await get_mindmap(charttype=charttype, turbo_mode=turbo_mode, macos_access=macos_access) # Ensure mindmap data is loaded
+        if not doc.mindmap:
+            print("ERROR: finalize_document: Mindmap data not loaded even after get_mindmap.", file=sys.stderr)
+            return {"error": "State Error", "message": "Mindmap data not loaded. Cannot finalize."}
 
-@mcp.tool()
-async def get_library_folder(ctx: Context[AppContext, Any] = None) -> Dict[str, Any]:
-    """
-    Get the MindManager library folder
-    
-    Args:
-        ctx: MCP context
-        
-    Returns:
-        Dict[str, Any]: Library folder path
-    """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
-    try:
-        library_folder = ctx.app.mindmanager.get_library_folder()
-        return {
-            "status": "success",
-            "library_folder": library_folder,
-            "platform": ctx.app.platform
-        }
+        print("Calling doc.finalize()", file=sys.stderr)
+        await asyncio.to_thread(doc.finalize) # Run sync MindManager code in thread
+        print("doc.finalize() completed.", file=sys.stderr)
+        return {"status": "success", "message": "Document finalized."}
     except Exception as e:
-        logger.error(f"Error getting library folder: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        return _handle_mindmanager_error("finalize_document", e)
 
 @mcp.tool()
 async def set_background_image(
     image_path: str,
-    ctx: Context[AppContext, Any] = None
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD
 ) -> Dict[str, Any]:
     """
-    Set the background image for the current document
-    
+    Sets the background image for the current MindManager document.
+
     Args:
-        image_path: Path to the image file
-        ctx: MCP context
-        
+        image_path (str): The absolute file path to the background image.
+        charttype (str): Chart type ('orgchart', 'radial', 'auto'). Defaults to 'auto'.
+        turbo_mode (bool): Enable turbo mode (text only). Defaults to False.
+        macos_access (str): Access method on macOS ('appscript', 'applescript'). Defaults to 'appscript'.
+
     Returns:
-        Dict[str, Any]: Operation status
+        Dict[str, Any]: Success message or error dictionary.
     """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
     try:
-        if not image_path:
-            return {"status": "error", "message": "Image path is required"}
-        
-        # Check if the file exists
-        if not os.path.exists(image_path):
-            return {"status": "error", "message": f"Image file not found: {image_path}"}
-        
-        # Set the background image
-        ctx.app.mindmanager.set_document_background_image(image_path)
-        
-        return {
-            "status": "success",
-            "image_path": image_path
-        }
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        print(f"Calling doc.set_background_image({image_path})", file=sys.stderr)
+        await asyncio.to_thread(doc.set_background_image, image_path) # Run sync MindManager code in thread
+        print("doc.set_background_image() completed.", file=sys.stderr)
+        return {"status": "success", "message": "Background image set."}
+    except FileNotFoundError as fnf_e:
+        print(f"ERROR: Background image file not found: {image_path} - {fnf_e}", file=sys.stderr)
+        return {"error": "File Not Found", "message": f"Background image file not found: {image_path}"}
     except Exception as e:
-        logger.error(f"Error setting background image: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        return _handle_mindmanager_error("set_background_image", e)
 
 @mcp.tool()
-async def export_to_mermaid(
-    id_only: bool = False,
-    ctx: Context[AppContext, Any] = None
-) -> Dict[str, Any]:
+async def get_library_folder(
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD
+) -> Union[str, Dict[str, str]]:
     """
-    Export the current mindmap to Mermaid format
-    
+    Gets the path to the MindManager library folder.
+
     Args:
-        id_only: If True, export with ID references only
-        ctx: MCP context
-        
+        charttype (str): Chart type ('orgchart', 'radial', 'auto'). Defaults to 'auto'.
+        turbo_mode (bool): Enable turbo mode (text only). Defaults to False.
+        macos_access (str): Access method on macOS ('appscript', 'applescript'). Defaults to 'appscript'.
+
     Returns:
-        Dict[str, Any]: Mermaid diagram representation
+        Union[str, Dict[str, str]]: The library folder path or error dictionary.
     """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
-    if not ctx.app.mindmanager.document_exists():
-        return {"status": "error", "message": "No document is open"}
-    
     try:
-        # Create MindmapDocument instance
-        doc = mindmap.MindmapDocument(
-            charttype=ctx.app.charttype, 
-            macos_access=ctx.app.macos_access if ctx.app.platform == "darwin" else None
-        )
-        
-        # Get the mindmap
-        result = doc.get_mindmap(mode="full")
-        if not result:
-            return {"status": "error", "message": "Failed to get mindmap"}
-        
-        # Create GUID mapping and serialize to Mermaid
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        print("Calling doc.get_library_folder()", file=sys.stderr)
+        folder_path = await asyncio.to_thread(doc.get_library_folder) # Run sync MindManager code in thread
+        print(f"doc.get_library_folder() returned: {folder_path}", file=sys.stderr)
+        return folder_path
+    except Exception as e:
+        return _handle_mindmanager_error("get_library_folder", e)
+
+@mcp.tool()
+async def get_grounding_information(
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD
+) -> Union[List[str], Dict[str, str]]:
+    """
+    Extracts grounding information (central topic, selected subtopics) from the mindmap.
+    Requires the mindmap and selection to be loaded first via get_mindmap and get_selection.
+
+    Args:
+        charttype (str): Chart type ('orgchart', 'radial', 'auto'). Defaults to 'auto'.
+        turbo_mode (bool): Enable turbo mode (text only). Defaults to False.
+        macos_access (str): Access method on macOS ('appscript', 'applescript'). Defaults to 'appscript'.
+
+    Returns:
+        Union[List[str], Dict[str, str]]: A list containing [top_most_topic, subtopics_string] or error dictionary.
+    """
+    try:
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        # Ensure mindmap and selection data are potentially loaded
+        if not doc.mindmap:
+             print("get_grounding_information: mindmap not loaded, calling get_mindmap first.", file=sys.stderr)
+             await get_mindmap(charttype=charttype, turbo_mode=turbo_mode, macos_access=macos_access)
+        # Check if selection was potentially populated by get_selection
+        # doc.selected_topic_texts might be None or empty list even after calling get_selection if nothing is selected
+        if not hasattr(doc, 'selected_topic_texts') or doc.selected_topic_texts is None:
+            print("get_grounding_information: selection not loaded, calling get_selection first.", file=sys.stderr)
+            await get_selection(charttype=charttype, turbo_mode=turbo_mode, macos_access=macos_access)
+
+        if not doc.mindmap:
+             print("ERROR: get_grounding_information: Mindmap data not loaded.", file=sys.stderr)
+             return {"error": "State Error", "message": "Mindmap data not loaded."}
+
+        # doc.get_grounding_information uses internal state, no need for await asyncio.to_thread
+        print("Calling doc.get_grounding_information()", file=sys.stderr)
+        top_most, subtopics_str = doc.get_grounding_information()
+        print(f"doc.get_grounding_information() returned: top='{top_most}', subtopics='{subtopics_str}'", file=sys.stderr)
+        return [top_most, subtopics_str] # Return as list for JSON
+    except Exception as e:
+        # This function doesn't directly call MindManager, so errors are less likely external
+        print(f"ERROR in get_grounding_information: {e}", file=sys.stderr)
+        return {"error": "Internal Error", "message": f"Failed to get grounding information: {e}"}
+
+# == Serialization Methods (Operating on current in-memory mindmap) ==
+
+@mcp.tool()
+async def serialize_current_mindmap_to_mermaid(
+    id_only: bool = False,
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD
+) -> Union[str, Dict[str, str]]:
+    """
+    Serializes the currently loaded mindmap to Mermaid format.
+    Requires the mindmap to be loaded first via get_mindmap.
+
+    Args:
+        id_only (bool): If True, only include IDs without detailed attributes. Defaults to False.
+        charttype (str): Chart type used for loading map if not already loaded.
+        turbo_mode (bool): Turbo mode used for loading map if not already loaded.
+        macos_access (str): Access method used for loading map if not already loaded.
+
+    Returns:
+        Union[str, Dict[str, str]]: Mermaid formatted string or error dictionary.
+    """
+    try:
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        if not doc.mindmap:
+            print("serialize_current_mindmap_to_mermaid: mindmap not loaded, calling get_mindmap first.", file=sys.stderr)
+            await get_mindmap(charttype=charttype, turbo_mode=turbo_mode, macos_access=macos_access) # Ensure mindmap data is loaded
+        if not doc.mindmap:
+            print("ERROR: serialize_current_mindmap_to_mermaid: Mindmap data not loaded. Cannot serialize.", file=sys.stderr)
+            return {"error": "State Error", "message": "Mindmap data not loaded. Cannot serialize."}
+
+        print(f"Serializing current mindmap to Mermaid (id_only={id_only}).", file=sys.stderr)
         guid_mapping = {}
         serialization.build_mapping(doc.mindmap, guid_mapping)
-        mermaid = serialization.serialize_mindmap(doc.mindmap, guid_mapping, id_only=id_only)
-        
-        return {
-            "status": "success",
-            "mermaid": mermaid
-        }
+        mermaid_string = serialization.serialize_mindmap(doc.mindmap, guid_mapping, id_only=id_only)
+        print("Serialization to Mermaid successful.", file=sys.stderr)
+        return mermaid_string
     except Exception as e:
-        logger.error(f"Error exporting to Mermaid: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        print(f"ERROR during serialization to Mermaid: {e}", file=sys.stderr)
+        return {"error": "Serialization Error", "message": f"Failed to serialize to Mermaid: {e}"}
 
 @mcp.tool()
-async def export_to_markdown(
+async def serialize_current_mindmap_to_markdown(
     include_notes: bool = True,
-    ctx: Context[AppContext, Any] = None
-) -> Dict[str, Any]:
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD
+) -> Union[str, Dict[str, str]]:
     """
-    Export the current mindmap to Markdown format
-    
+    Serializes the currently loaded mindmap to Markdown format.
+    Requires the mindmap to be loaded first via get_mindmap.
+
     Args:
-        include_notes: If True, include notes
-        ctx: MCP context
-        
-    Returns:
-        Dict[str, Any]: Markdown representation
-    """
-    if not ctx.app.mindmanager:
-        return {"status": "error", "message": "MindManager not initialized"}
-    
-    if not ctx.app.mindmanager.document_exists():
-        return {"status": "error", "message": "No document is open"}
-    
-    try:
-        # Create MindmapDocument instance
-        doc = mindmap.MindmapDocument(
-            charttype=ctx.app.charttype, 
-            macos_access=ctx.app.macos_access if ctx.app.platform == "darwin" else None
-        )
-        
-        # Get the mindmap
-        result = doc.get_mindmap(mode="full" if include_notes else "text")
-        if not result:
-            return {"status": "error", "message": "Failed to get mindmap"}
-        
-        # Serialize to Markdown
-        markdown = serialization.serialize_mindmap_markdown(doc.mindmap, include_notes=include_notes)
-        
-        return {
-            "status": "success",
-            "markdown": markdown
-        }
-    except Exception as e:
-        logger.error(f"Error exporting to Markdown: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        include_notes (bool): If True, include notes in the output. Defaults to True.
+        charttype (str): Chart type used for loading map if not already loaded.
+        turbo_mode (bool): Turbo mode used for loading map if not already loaded.
+        macos_access (str): Access method used for loading map if not already loaded.
 
-@mcp.resource("mindmanager://info")
-async def get_mindmanager_info() -> str:
-    """
-    Get information about the MindManager application
-    
     Returns:
-        str: Information about MindManager
+        Union[str, Dict[str, str]]: Markdown formatted string or error dictionary.
     """
-    # Now, how do we access the context?
-    # Let's try to get it from a global variable or another approach
-    
-    # Example approach using a global variable to access the context
-    from mcp.server.fastmcp import get_current_context
-    
     try:
-        # Get the current context
-        ctx = get_current_context()
-        
-        # Check if MindManager is initialized
-        if not hasattr(ctx.app, 'mindmanager') or ctx.app.mindmanager is None:
-            return "MindManager is not initialized"
-        
-        version = ctx.app.mindmanager.get_version()
-        platform = ctx.app.platform
-        library = ctx.app.mindmanager.get_library_folder()
-        
-        info = (
-            f"MindManager Information\n"
-            f"----------------------\n"
-            f"Version: {version}\n"
-            f"Platform: {platform}\n"
-            f"Library Folder: {library}\n"
-        )
-        
-        if ctx.app.mindmanager.document_exists():
-            info += "Status: Document is open\n"
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        if not doc.mindmap:
+             print("serialize_current_mindmap_to_markdown: mindmap not loaded, calling get_mindmap first.", file=sys.stderr)
+             await get_mindmap(charttype=charttype, turbo_mode=turbo_mode, macos_access=macos_access) # Ensure mindmap data is loaded
+        if not doc.mindmap:
+            print("ERROR: serialize_current_mindmap_to_markdown: Mindmap data not loaded. Cannot serialize.", file=sys.stderr)
+            return {"error": "State Error", "message": "Mindmap data not loaded. Cannot serialize."}
+
+        print(f"Serializing current mindmap to Markdown (include_notes={include_notes}).", file=sys.stderr)
+        markdown_string = serialization.serialize_mindmap_markdown(doc.mindmap, include_notes=include_notes)
+        print("Serialization to Markdown successful.", file=sys.stderr)
+        return markdown_string
+    except Exception as e:
+        print(f"ERROR during serialization to Markdown: {e}", file=sys.stderr)
+        return {"error": "Serialization Error", "message": f"Failed to serialize to Markdown: {e}"}
+
+
+@mcp.tool()
+async def serialize_current_mindmap_to_json(
+    ignore_rtf: bool = True,
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD
+) -> Union[Dict[str, Any], Dict[str, str]]:
+    """
+    Serializes the currently loaded mindmap to a detailed JSON object with ID mapping.
+    Requires the mindmap to be loaded first via get_mindmap.
+
+    Args:
+        ignore_rtf (bool): Whether to ignore RTF content. Defaults to True.
+        charttype (str): Chart type used for loading map if not already loaded.
+        turbo_mode (bool): Turbo mode used for loading map if not already loaded.
+        macos_access (str): Access method used for loading map if not already loaded.
+
+    Returns:
+        Union[Dict[str, Any], Dict[str, str]]: JSON serializable dictionary or error dictionary.
+    """
+    try:
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        if not doc.mindmap:
+             print("serialize_current_mindmap_to_json: mindmap not loaded, calling get_mindmap first.", file=sys.stderr)
+             await get_mindmap(charttype=charttype, turbo_mode=turbo_mode, macos_access=macos_access) # Ensure mindmap data is loaded
+        if not doc.mindmap:
+            print("ERROR: serialize_current_mindmap_to_json: Mindmap data not loaded. Cannot serialize.", file=sys.stderr)
+            return {"error": "State Error", "message": "Mindmap data not loaded. Cannot serialize."}
+
+        print(f"Serializing current mindmap to detailed JSON (ignore_rtf={ignore_rtf}).", file=sys.stderr)
+        guid_mapping = {}
+        serialization.build_mapping(doc.mindmap, guid_mapping)
+        serialized_data = serialization.serialize_object(doc.mindmap, guid_mapping, ignore_rtf=ignore_rtf)
+        print("Serialization to detailed JSON successful.", file=sys.stderr)
+        return serialized_data
+    except Exception as e:
+        print(f"ERROR during serialization to JSON: {e}", file=sys.stderr)
+        return {"error": "Serialization Error", "message": f"Failed to serialize to JSON: {e}"}
+
+@mcp.tool()
+async def serialize_current_mindmap_to_json_simple(
+    ignore_rtf: bool = True,
+    charttype: str = 'auto',
+    turbo_mode: bool = False,
+    macos_access: str = MACOS_ACCESS_METHOD
+) -> Union[Dict[str, Any], Dict[str, str]]:
+    """
+    Serializes the currently loaded mindmap to a simple JSON object without ID mapping.
+    Requires the mindmap to be loaded first via get_mindmap.
+
+    Args:
+        ignore_rtf (bool): Whether to ignore RTF content. Defaults to True.
+        charttype (str): Chart type used for loading map if not already loaded.
+        turbo_mode (bool): Turbo mode used for loading map if not already loaded.
+        macos_access (str): Access method used for loading map if not already loaded.
+
+    Returns:
+        Union[Dict[str, Any], Dict[str, str]]: JSON serializable dictionary or error dictionary.
+    """
+    try:
+        doc = await _get_doc_instance(charttype, turbo_mode, macos_access)
+        if not doc.mindmap:
+             print("serialize_current_mindmap_to_json_simple: mindmap not loaded, calling get_mindmap first.", file=sys.stderr)
+             await get_mindmap(charttype=charttype, turbo_mode=turbo_mode, macos_access=macos_access) # Ensure mindmap data is loaded
+        if not doc.mindmap:
+            print("ERROR: serialize_current_mindmap_to_json_simple: Mindmap data not loaded. Cannot serialize.", file=sys.stderr)
+            return {"error": "State Error", "message": "Mindmap data not loaded. Cannot serialize."}
+
+        print(f"Serializing current mindmap to simple JSON (ignore_rtf={ignore_rtf}).", file=sys.stderr)
+        serialized_data = serialization.serialize_object_simple(doc.mindmap, ignore_rtf=ignore_rtf)
+        print("Serialization to simple JSON successful.", file=sys.stderr)
+        return serialized_data
+    except Exception as e:
+        print(f"ERROR during serialization to simple JSON: {e}", file=sys.stderr)
+        return {"error": "Serialization Error", "message": f"Failed to serialize to simple JSON: {e}"}
+
+# == Deserialization Methods (Standalone - Do not interact with MindManager) ==
+
+@mcp.tool()
+async def deserialize_mermaid_id_to_mindmap_topic(
+    mermaid_text: str,
+    guid_mapping_json: str
+) -> Union[Dict[str, Any], Dict[str, str]]:
+    """
+    Deserializes Mermaid text (ID format) into a MindmapTopic structure (JSON).
+    Does NOT interact with MindManager.
+
+    Args:
+        mermaid_text (str): Mermaid string with 'id<number>[Text]' format nodes.
+        guid_mapping_json (str): JSON string representing the ID to GUID mapping.
+
+    Returns:
+        Union[Dict[str, Any], Dict[str, str]]: Serialized MindmapTopic structure or error dictionary.
+    """
+    guid_mapping_dict = {}
+    try:
+        guid_mapping_dict = json.loads(guid_mapping_json)
+        print(f"Parsed guid_mapping_json (length: {len(guid_mapping_dict)})", file=sys.stderr)
+        # guid_mapping_dict = {k: int(v) for k, v in guid_mapping_dict.items()} # Keep mapping as is
+    except json.JSONDecodeError as json_e:
+        print(f"ERROR: Invalid JSON provided for guid_mapping_json: {json_e}", file=sys.stderr)
+        return {"error": "Input Error", "message": f"Invalid JSON provided for guid_mapping_json: {json_e}"}
+    except ValueError as val_e:
+            print(f"ERROR: Invalid value in guid_mapping_json (expected int for ID): {val_e}", file=sys.stderr)
+            return {"error": "Input Error", "message": f"Invalid value in guid_mapping_json (expected int for ID): {val_e}"}
+
+
+    try:
+        print("Deserializing Mermaid ID text (standalone)...", file=sys.stderr)
+        root_topic = serialization.deserialize_mermaid_with_id(mermaid_text, guid_mapping_dict)
+        if root_topic:
+            print("Deserialization from Mermaid ID successful.", file=sys.stderr)
+            return serialization.serialize_object_simple(root_topic) # Return as simple JSON
         else:
-            info += "Status: No document is open\n"
-            
-        return info
+            print("ERROR: Failed to deserialize Mermaid ID text.", file=sys.stderr)
+            return {"error": "Deserialization Error", "message": "Failed to deserialize Mermaid ID text."}
     except Exception as e:
-        logger.error(f"Error getting MindManager info: {str(e)}")
-        return f"Error getting MindManager info: {str(e)}"
+        print(f"ERROR during deserialization from Mermaid ID: {e}", file=sys.stderr)
+        return {"error": "Deserialization Error", "message": f"Failed to deserialize Mermaid ID text: {e}"}
 
-if __name__ == "__main__":
-    import argparse
-    import uvicorn
-    import anyio
-    
-    parser = argparse.ArgumentParser(description="MindManager MCP Server")
-    parser.add_argument("--host", type=str, default="localhost", help="Host to bind the server to")
-    parser.add_argument("--port", type=int, default=8000, help="Port to bind the server to")
-    args = parser.parse_args()
-    
-    logger.info(f"Starting MindManager MCP server on {args.host}:{args.port}")
-    
-    # Option 1: Try running with transport="sse" explicitly
+@mcp.tool()
+async def deserialize_mermaid_full_to_mindmap_topic(
+    mermaid_text: str,
+    guid_mapping_json: str
+) -> Union[Dict[str, Any], Dict[str, str]]:
+    """
+    Deserializes Mermaid text (full format with metadata) into a MindmapTopic structure (JSON).
+    Does NOT interact with MindManager.
+
+    Args:
+        mermaid_text (str): Mermaid string with JSON metadata comments.
+        guid_mapping_json (str): JSON string representing the ID to GUID mapping.
+
+    Returns:
+        Union[Dict[str, Any], Dict[str, str]]: Serialized MindmapTopic structure or error dictionary.
+    """
+    guid_mapping_dict = {}
     try:
-        from mcp.server.config import set_server_settings
-        # Try to set server settings if the function exists
-        set_server_settings(host=args.host, port=args.port)
-    except ImportError:
-        pass
-    
-    # Run the server with sse transport (web server)
-    mcp.run(transport="sse")
+        guid_mapping_dict = json.loads(guid_mapping_json)
+        print(f"Parsed guid_mapping_json (length: {len(guid_mapping_dict)})", file=sys.stderr)
+        # guid_mapping_dict = {k: int(v) for k, v in guid_mapping_dict.items()} # Keep mapping as is
+    except json.JSONDecodeError as json_e:
+        print(f"ERROR: Invalid JSON provided for guid_mapping_json: {json_e}", file=sys.stderr)
+        return {"error": "Input Error", "message": f"Invalid JSON provided for guid_mapping_json: {json_e}"}
+    except ValueError as val_e:
+            print(f"ERROR: Invalid value in guid_mapping_json (expected int for ID): {val_e}", file=sys.stderr)
+            return {"error": "Input Error", "message": f"Invalid value in guid_mapping_json (expected int for ID): {val_e}"}
+
+    try:
+        print("Deserializing full Mermaid text (standalone)...", file=sys.stderr)
+        root_topic = serialization.deserialize_mermaid_full(mermaid_text, guid_mapping_dict)
+        if root_topic:
+            print("Deserialization from full Mermaid successful.", file=sys.stderr)
+            return serialization.serialize_object_simple(root_topic) # Return as simple JSON
+        else:
+             print("ERROR: Failed to deserialize full Mermaid text.", file=sys.stderr)
+             return {"error": "Deserialization Error", "message": "Failed to deserialize full Mermaid text."}
+    except Exception as e:
+        print(f"ERROR during deserialization from full Mermaid: {e}", file=sys.stderr)
+        return {"error": "Deserialization Error", "message": f"Failed to deserialize full Mermaid text: {e}"}
+
+
+# --- Main Execution ---
+if __name__ == "__main__":
+    print("Starting MindManager Automation MCP Server...", file=sys.stderr)
+    # Run the server using stdio transport by default
+    # You can add command-line arguments here to configure transport, etc.
+    # For example: mcp.run(transport='stdio', host='localhost', port=8080) for SSE
+    try:
+        mcp.run(transport='stdio')
+    except Exception as main_e:
+        print(f"FATAL: Server crashed: {main_e}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        print("MindManager Automation MCP Server stopped.", file=sys.stderr)
 

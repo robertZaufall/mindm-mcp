@@ -38,54 +38,29 @@ git clone https://github.com/robertZaufall/mindm-mcp.git
 cd mindm-mcp
 ```
 
+```bash
+# Install required packages
+uv run mcp dev mindm_mcp/server.py
+
+# Clone the repository (if you're using it from a repository)
+git clone https://github.com/robertZaufall/mindm-mcp.git
+cd mindm-mcp
+```
+
 ## Usage
 
 ### Starting the server
 
 ```bash
 # Using the CLI
-python server.py --host localhost --port 8000
+python server.py
 
 # Alternative: Install with the MCP CLI
-mcp install server.py
-```
+pip install 'mcp[cli]'
+mcp install mindm_mcp/server.py
 
-### Client example
-
-```python
-import asyncio
-from client import MindManagerClient
-
-async def main():
-    # Create client instance
-    client = MindManagerClient(server_url="http://localhost:8000")
-    
-    try:
-        # Connect to server
-        await client.connect()
-        
-        # Initialize connection to MindManager
-        result = await client.initialize()
-        if result["status"] == "success":
-            print("Connected to MindManager successfully!")
-            
-        # Get the central topic
-        central = await client.get_central_topic()
-        if central["status"] == "success":
-            topic = central.get("topic", {})
-            print(f"Central topic: {topic.get('text', '')}")
-            
-        # Add a subtopic
-        if topic and "guid" in topic:
-            subtopic = await client.add_subtopic(topic["guid"], "New subtopic from MCP")
-            print(f"Added subtopic with GUID: {subtopic.get('guid', '')}")
-    
-    finally:
-        # Disconnect when done
-        await client.disconnect()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+# for debugging
+mcp dev mindm_mcp/server.py
 ```
 
 ## MCP Tools

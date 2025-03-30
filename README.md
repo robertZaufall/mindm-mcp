@@ -112,20 +112,27 @@ Adjust `VIRTUAL_ENV` as needed.
 
 The server exposes the following tools through the Model Context Protocol:
 
-- `initialize`: Initialize connection to MindManager
-- `get_version`: Get MindManager version
-- `get_mindmap`: Get the current mindmap structure
-- `get_central_topic`: Get the central topic of the current mindmap
-- `get_selection`: Get currently selected topics
-- `create_mindmap`: Create a new mindmap from provided structure
-- `add_subtopic`: Add a subtopic to an existing topic
-- `set_topic_text`: Update a topic's text content
-- `add_relationship`: Add a relationship between topics
-- `add_tag`: Add a tag to a topic
-- `get_library_folder`: Get MindManager library folder path
-- `set_background_image`: Set document background image
-- `export_to_mermaid`: Export mindmap to Mermaid format
-- `export_to_markdown`: Export mindmap to Markdown format
+### Document Interaction
+- `get_mindmap`: Retrieves the current mindmap structure from MindManager
+- `get_selection`: Retrieves the currently selected topics in MindManager
+- `finalize_document`: Finalizes the layout of the current MindManager document
+- `set_background_image`: Sets the background image for the current MindManager document
+- `get_library_folder`: Gets the path to the MindManager library folder
+- `get_grounding_information`: Extracts grounding information (central topic, selected subtopics) from the mindmap
+
+### Creating Mindmaps
+- `create_mindmap_from_mermaid_full`: Creates a new MindManager mindmap from full Mermaid text with metadata
+- `create_mindmap_from_mermaid_id`: Creates a new MindManager mindmap from Mermaid text with only IDs
+
+### Serialization
+- `serialize_current_mindmap_to_mermaid`: Serializes the currently loaded mindmap to Mermaid format
+- `serialize_current_mindmap_to_markdown`: Serializes the currently loaded mindmap to Markdown format
+- `serialize_current_mindmap_to_json`: Serializes the currently loaded mindmap to a detailed JSON object with ID mapping
+- `serialize_current_mindmap_to_json_simple`: Serializes the currently loaded mindmap to a simple JSON object without ID mapping
+
+### Deserialization (Standalone)
+- `deserialize_mermaid_id_to_mindmap_topic`: Deserializes Mermaid text (ID format) into a MindmapTopic structure (JSON)
+- `deserialize_mermaid_full_to_mindmap_topic`: Deserializes Mermaid text (full format with metadata) into a MindmapTopic structure (JSON)
 
 ## Platform Support
 

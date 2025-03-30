@@ -8,7 +8,6 @@ This server allows you to programmatically interact with MindManager through the
 
 ## Features
 
-- Initialize MindManager connection with platform-specific settings
 - Retrieve mindmap structure and central topics
 - Create new mindmaps from serialized data
 - Add, modify, and manipulate topics and subtopics
@@ -21,7 +20,7 @@ This server allows you to programmatically interact with MindManager through the
 
 ## Requirements
 
-- Python 3.9 or higher
+- Python 3.12 or higher
 - `mcp` package (Model Context Protocol SDK)
 - `mindm` library (included in this project)
 - MindManager (supported versions: 23-) installed on Windows or macOS
@@ -29,38 +28,84 @@ This server allows you to programmatically interact with MindManager through the
 ## Installation
 
 ```bash
-# Install required packages
-pip install mcp
-pip install -U --index-url=https://test.pypi.org/simple/ --extra-index-url=https://pypi.org/simple/ mindm mindm-mcp
-
 # Clone the repository (if you're using it from a repository)
 git clone https://github.com/robertZaufall/mindm-mcp.git
 cd mindm-mcp
-```
 
-```bash
-# Install required packages
-uv run mcp dev mindm_mcp/server.py
+# create a virtual environment for Python
+brew install uv # if needed
+uv pip install -r pyproject.toml
 
-# Clone the repository (if you're using it from a repository)
-git clone https://github.com/robertZaufall/mindm-mcp.git
-cd mindm-mcp
+# alternative: manual installation of modules
+uv add "mcp[cli]"
+uv add fastmcp
+uv add markdown-it-py
+uv add -U --index-url=https://test.pypi.org/simple/ --extra-index-url=https://pypi.org/simple/ mindm mindm-mcp
 ```
 
 ## Usage
 
-### Starting the server
+### MCP inspector
 
 ```bash
-# Using the CLI
-python server.py
+# run mcp with inspector
+uv run mcp dev mindm_mcp/server.py
+```
 
-# Alternative: Install with the MCP CLI
-pip install 'mcp[cli]'
-mcp install mindm_mcp/server.py
+### Claude Desktop
 
-# for debugging
-mcp dev mindm_mcp/server.py
+#### Local python file
+
+Adjust the path for the local file as needed.
+```json
+{
+  "mcpServers": {
+    "mindm (MindManager)": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with",
+        "mindm",
+        "--with",
+        "fastmcp",
+        "--with",
+        "markdown-it-py",
+        "/Users/master/git/mindm-mcp/mindm_mcp/server.py"
+      ]
+    }
+  }
+}
+```
+
+#### Module from package repository
+
+Adjust `VIRTUAL_ENV` as needed.
+```json
+{
+    "mcpServers": {
+      "mindm (MindManager)": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--with",
+          "mindm",
+          "--with",
+          "mindm-mcp>=0.0.1.39",
+          "--with",
+          "fastmcp",
+          "--with",
+          "markdown-it-py",
+          "--index-url=https://test.pypi.org/simple/",
+          "--extra-index-url=https://pypi.org/simple/",
+          "-m",
+          "mindm_mcp.server"
+        ],
+        "env": {
+            "VIRTUAL_ENV": "/Users/master/git/mindm-mcp/.venv"
+        }
+      }
+    }
+}
 ```
 
 ## MCP Tools
@@ -82,12 +127,6 @@ The server exposes the following tools through the Model Context Protocol:
 - `export_to_mermaid`: Export mindmap to Mermaid format
 - `export_to_markdown`: Export mindmap to Markdown format
 
-## MCP Resources
-
-The server exposes the following resources:
-
-- `mindmanager://info`: Information about the MindManager application
-
 ## Platform Support
 
 - **Windows**: Full support for topics, notes, icons, images, tags, links, relationships, and RTF formatting
@@ -98,19 +137,18 @@ The server exposes the following resources:
 This MCP server can be installed in Claude Desktop or other MCP-compatible applications, allowing LLMs to:
 
 1. Access mindmap content
-2. Manipulate mindmaps programmatically
+2. Manipulate mindmaps
 3. Create new mindmaps based on LLM-generated content
 
 ## Troubleshooting
 
 - Ensure MindManager is running before starting the server
-- For macOS, verify that the `appscript` package is installed
+- For macOS, make sure you allow Claude Desktop to automate MindManager
 - Check that the correct MindManager version (23-26) is installed
-- Verify server URL and port settings in the client
 
 ## Acknowledgements
 
-This project is built upon the `mindm` library developed by Robert Zaufall, providing Python interfaces to MindManager on Windows and macOS platforms. It uses the Model Context Protocol (MCP) SDK developed by Anthropic.
+This project is built upon the `mindm` library, providing Python interfaces to MindManager on Windows and macOS platforms. It uses the Model Context Protocol (MCP) SDK developed by Anthropic.
 
 ## License
 

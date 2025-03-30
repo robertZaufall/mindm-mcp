@@ -1,0 +1,25 @@
+{
+    "mcpServers": {
+      "mindm (MindManager)": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--with",
+          "mindm",
+          "--with",
+          "mindm-mcp>=0.0.1.39",
+          "--with",
+          "fastmcp",
+          "--with",
+          "markdown-it-py",
+          "--index-url=https://test.pypi.org/simple/",
+          "--extra-index-url=https://pypi.org/simple/",
+          "-m",
+          "mindm_mcp.server"
+        ],
+        "env": {
+            "VIRTUAL_ENV": "/Users/master/git/mindm-mcp/.venv"
+        }
+      }
+    }
+}

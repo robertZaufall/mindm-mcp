@@ -1,0 +1,17 @@
+{
+    "mcpServers": {
+      "mindm (MindManager)": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--with",
+          "mindm",
+          "--with",
+          "fastmcp",
+          "--with",
+          "markdown-it-py",
+          "/Users/master/git/mindm-mcp/mindm_mcp/server.py"
+        ]
+      }
+    }
+}

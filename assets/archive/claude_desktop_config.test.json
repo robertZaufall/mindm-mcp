@@ -1,0 +1,54 @@
+[
+{
+    "mcpServers": {
+        "mindm": {
+            "command": "uvx",
+            "args": [
+                "--index-url=https://test.pypi.org/simple/",
+                "--extra-index-url=https://pypi.org/simple/",
+                "mindm-mcp"
+            ],
+            "env": {
+                "PIP_INDEX_URL": "https://test.pypi.org/simple/",
+                "PIP_EXTRA_INDEX_URL": "https://pypi.org/simple/"
+            }
+        }
+    }
+}
+,
+{
+    "mcpServers": {
+        "mindm": {
+            "command": "uvx",
+            "args": [
+                "--with",
+                "mindm",
+                "--with",
+                "fastmcp",
+                "--with",
+                "markdown-it-py",
+                      "--index-url=https://test.pypi.org/simple/",
+                "--extra-index-url=https://pypi.org/simple/",
+                "mindm-mcp"
+            ],
+            "env": {
+                "PIP_INDEX_URL": "https://test.pypi.org/simple/",
+                "PIP_EXTRA_INDEX_URL": "https://pypi.org/simple/"
+            }
+        }
+    }
+}
+,
+{
+    "mcpServers": {
+      "whatsapp": {
+        "command": "{{PATH}}/.local/bin/uv",
+        "args": [
+          "--directory",
+          "{{PATH}}/mindm-mcp/mindm_mcp",
+          "run",
+          "server.py"
+        ]
+      }
+    }
+}

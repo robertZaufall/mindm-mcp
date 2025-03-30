@@ -674,13 +674,8 @@ async def deserialize_mermaid_full_to_mindmap_topic(
         print(f"ERROR during deserialization from full Mermaid: {e}", file=sys.stderr)
         return {"error": "Deserialization Error", "message": f"Failed to deserialize full Mermaid text: {e}"}
 
-
-# --- Main Execution ---
-if __name__ == "__main__":
+def main():
     print("Starting MindManager Automation MCP Server...", file=sys.stderr)
-    # Run the server using stdio transport by default
-    # You can add command-line arguments here to configure transport, etc.
-    # For example: mcp.run(transport='stdio', host='localhost', port=8080) for SSE
     try:
         mcp.run(transport='stdio')
     except Exception as main_e:
@@ -688,3 +683,7 @@ if __name__ == "__main__":
         sys.exit(1)
     finally:
         print("MindManager Automation MCP Server stopped.", file=sys.stderr)
+
+# --- Main Execution ---
+if __name__ == "__main__":
+    main()

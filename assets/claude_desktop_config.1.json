@@ -7,7 +7,7 @@
           "--with",
           "mindm",
           "--with",
-          "mindm-mcp>=0.0.1.39",
+          "mindm-mcp>=0.0.1.42",
           "--with",
           "fastmcp",
           "--with",

@@ -22,7 +22,7 @@ install:
 # Generate documentation
 llms:
 	uv pip install gitingest
-	gitingest . -o llms.txt -i "pyproject.toml,update_version.py,LICENSE,README.md,mindm_mcp/*" -e "llms.txt,mindm_mcp/__pycache__,mindm_mcp/.DS_Store,mindmap/.DS.Store"
+	gitingest . -o llms.txt -i "pyproject.toml,update_version.py,LICENSE,README.md,examples/*,mindm_mcp/*,assets/*.json" -e "llms.txt,mindm_mcp/__pycache__,mindm_mcp/.DS_Store,mindmap/.DS.Store,assets/archive/*"
 
 # Help
 help:

@@ -1,14 +1,16 @@
-name: Build and Publish TestPyPI
+name: Build and Publish PyPI
 
 on:
   workflow_dispatch:
+  release:
+    types: [created]
 
 jobs:
   build-and-publish:
     runs-on: windows-latest
     environment:
-      name: testpypi
-      url: https://test.pypi.org/p/mindm-mcp
+      name: pypi
+      url: https://pypi.org/p/mindm-mcp
     permissions:
       contents: read
       id-token: write
@@ -31,6 +33,6 @@ jobs:
   
       - name: Verify package
         run: twine check dist/*
-
-      - name: Publish to TestPyPI
-        run: twine upload --verbose --repository testpypi dist/*
+      
+      - name: Publish to PyPI
+        run: twine upload --verbose --repository pypi dist/*

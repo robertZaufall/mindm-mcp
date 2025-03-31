@@ -25,7 +25,7 @@ This server allows you to programmatically interact with MindManager through the
 - `mindm` library (included in this project)
 - MindManager (supported versions: 23-) installed on Windows or macOS
 
-## Installation
+## Installation mcOS
 
 ```bash
 # Clone the repository (if you're using it from a repository)
@@ -43,13 +43,34 @@ uv add markdown-it-py
 uv add -U --index-url=https://test.pypi.org/simple/ --extra-index-url=https://pypi.org/simple/ mindm mindm-mcp
 ```
 
+## Installation Windows
+
+```bash
+# Change to DOS command prompt
+cmd
+
+# Clone the repository (if you're using it from a repository)
+git clone https://github.com/robertZaufall/mindm-mcp.git
+cd mindm-mcp
+
+# create a virtual environment for Python
+pip install uv # if needed
+uv pip install -r pyproject.toml
+
+# install nodejs
+choco install nodejs # if you have chocolatey installed. If not install nodejs otherwise
+refreshenv
+node -v
+npm install -g npx
+```
+
 ## Usage
 
 ### MCP inspector
 
 ```bash
 # run mcp with inspector
-uv run mcp dev mindm_mcp/server.py
+uv run --with mindm --with fastmcp --with markdown-it-py mcp dev mindm_mcp/server.py
 ```
 
 ### Claude Desktop
@@ -90,7 +111,7 @@ Adjust `VIRTUAL_ENV` as needed.
           "--with",
           "mindm",
           "--with",
-          "mindm-mcp>=0.0.1.39",
+          "mindm-mcp>=0.0.1.42",
           "--with",
           "fastmcp",
           "--with",
@@ -108,6 +129,9 @@ Adjust `VIRTUAL_ENV` as needed.
 }
 ```
 
+Hint: If the MCP server does not show up with the hammer icon on Windows, close Claude Desktop and kill all background processes.  
+
+
 ## MCP Tools
 
 The server exposes the following tools through the Model Context Protocol:
@@ -115,24 +139,14 @@ The server exposes the following tools through the Model Context Protocol:
 ### Document Interaction
 - `get_mindmap`: Retrieves the current mindmap structure from MindManager
 - `get_selection`: Retrieves the currently selected topics in MindManager
-- `finalize_document`: Finalizes the layout of the current MindManager document
-- `set_background_image`: Sets the background image for the current MindManager document
 - `get_library_folder`: Gets the path to the MindManager library folder
 - `get_grounding_information`: Extracts grounding information (central topic, selected subtopics) from the mindmap
-
-### Creating Mindmaps
-- `create_mindmap_from_mermaid_full`: Creates a new MindManager mindmap from full Mermaid text with metadata
-- `create_mindmap_from_mermaid_id`: Creates a new MindManager mindmap from Mermaid text with only IDs
 
 ### Serialization
 - `serialize_current_mindmap_to_mermaid`: Serializes the currently loaded mindmap to Mermaid format
 - `serialize_current_mindmap_to_markdown`: Serializes the currently loaded mindmap to Markdown format
 - `serialize_current_mindmap_to_json`: Serializes the currently loaded mindmap to a detailed JSON object with ID mapping
-- `serialize_current_mindmap_to_json_simple`: Serializes the currently loaded mindmap to a simple JSON object without ID mapping
 
-### Deserialization (Standalone)
-- `deserialize_mermaid_id_to_mindmap_topic`: Deserializes Mermaid text (ID format) into a MindmapTopic structure (JSON)
-- `deserialize_mermaid_full_to_mindmap_topic`: Deserializes Mermaid text (full format with metadata) into a MindmapTopic structure (JSON)
 
 ## Platform Support
 

@@ -9,14 +9,17 @@ This server allows you to programmatically interact with MindManager through the
 ## Features
 
 - Retrieve mindmap structure and central topics
+- Export mindmaps to Mermaid, Markdown, JSON formats to be used in LLM chats
+- Get information about MindManager installation and library folders
+- Get current selection from MindManager
+
+## Planned Features
+
 - Create new mindmaps from serialized data
 - Add, modify, and manipulate topics and subtopics
 - Add relationships between topics
 - Add tags to topics
-- Export mindmaps to Mermaid and Markdown formats
-- Get information about MindManager installation and library folders
 - Set document background images
-- Get current selection from MindManager
 
 ## Requirements
 

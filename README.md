@@ -6,6 +6,10 @@ A Model Context Protocol (MCP) server implementation for the `mindm` library, pr
 
 This server allows you to programmatically interact with MindManager through the Model Context Protocol (MCP), a standardized way to provide context and tools to LLMs. It leverages the `mindm` library to manipulate MindManager documents, topics, relationships, and other mindmap elements.
 
+Example:
+
+![MindManager MCP in Claude](assets/claude.png)
+
 ## Features
 
 - Retrieve mindmap structure and central topics

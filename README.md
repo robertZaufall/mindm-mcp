@@ -32,7 +32,7 @@ Example:
 - `mindm` library (included in this project)
 - MindManager (supported versions: 23-) installed on Windows or macOS
 
-## Installation mcOS
+## Installation macOS
 
 ```bash
 # Clone the repository (if you're using it from a repository)

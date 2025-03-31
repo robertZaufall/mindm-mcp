@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mindm_mcp"
-version = "0.0.1.49"
+version = "0.0.1.50"
 authors = [
   { name="Robert Zaufall" },
 ]
@@ -30,8 +30,8 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/robertZaufall/mindm_mcp"
-"Bug Tracker" = "https://github.com/robertZaufall/mindm_mcp/issues"
+"Homepage" = "https://github.com/robertZaufall/mindm-mcp"
+"Bug Tracker" = "https://github.com/robertZaufall/mindm-mcp/issues"
 
 [project.scripts]
 mindm-mcp = "mindm_mcp.server:main"

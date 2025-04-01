@@ -11,7 +11,7 @@ This server allows you to programmatically interact with MindManager through the
 
 Example:
 
-![MindManager MCP in Claude](assets/claude.png)
+![MindManager MCP in Claude](https://github.com/robertZaufall/mindm-mcp/blob/master/assets/claude.png?raw=true)
 
 ## Features
 

@@ -365,7 +365,7 @@ wheels = [
 
 [[package]]
 name = "mindm-mcp"
-version = "0.0.1.57"
+version = "0.0.1.58"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

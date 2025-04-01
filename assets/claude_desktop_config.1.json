@@ -5,15 +5,13 @@
         "args": [
           "run",
           "--with",
-          "mindm",
+          "mindm>=0.0.4.6",
           "--with",
           "mindm-mcp>=0.0.1.42",
           "--with",
           "fastmcp",
           "--with",
           "markdown-it-py",
-          "--index-url=https://test.pypi.org/simple/",
-          "--extra-index-url=https://pypi.org/simple/",
           "-m",
           "mindm_mcp.server"
         ],

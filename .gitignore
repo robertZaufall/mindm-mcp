@@ -11,3 +11,4 @@ venv
 dist/
 out/
 docs/_build/
+.repomix/

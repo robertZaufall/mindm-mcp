@@ -13,7 +13,7 @@ update-version:
 
 # Build the package
 build:
-	python -m build
+	uv run -m build
 
 # Install the package
 install:

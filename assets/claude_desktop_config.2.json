@@ -5,7 +5,7 @@
         "args": [
           "run",
           "--with",
-          "mindm",
+          "mindm>=0.0.4.6",
           "--with",
           "fastmcp",
           "--with",

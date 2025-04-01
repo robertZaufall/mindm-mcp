@@ -1,6 +1,9 @@
 # MindManager MCP Server
 
-A Model Context Protocol (MCP) server implementation for the `mindm` library, providing a standardized interface to interact with MindManager on Windows and macOS.
+A Model Context Protocol (MCP) server implementation for the `mindm` library, providing a standardized interface to interact with MindManager on Windows and macOS.  
+
+[![PyPI version](https://img.shields.io/pypi/v/mindm-mcp.svg)](https://pypi.org/project/mindm-mcp/)
+[![PyPI version](https://img.shields.io/pypi/v/mindm.svg)](https://pypi.org/project/mindm/)
 
 ## Overview
 
@@ -77,7 +80,7 @@ npm install -g npx
 
 ```bash
 # run mcp with inspector
-uv run --with mindm --with fastmcp --with markdown-it-py mcp dev mindm_mcp/server.py
+uv run --with mind --with fastmcp --with markdown-it-py mcp dev mindm_mcp/server.py
 ```
 
 ### Claude Desktop
@@ -93,7 +96,7 @@ Adjust the path for the local file as needed.
       "args": [
         "run",
         "--with",
-        "mindm",
+        "mindm>=0.0.4.6",
         "--with",
         "fastmcp",
         "--with",
@@ -116,15 +119,13 @@ Adjust `VIRTUAL_ENV` as needed.
         "args": [
           "run",
           "--with",
-          "mindm",
+          "mindm>=0.0.4.6",
           "--with",
-          "mindm-mcp>=0.0.1.42",
+          "mindm-mcp>=0.0.1.50",
           "--with",
           "fastmcp",
           "--with",
           "markdown-it-py",
-          "--index-url=https://test.pypi.org/simple/",
-          "--extra-index-url=https://pypi.org/simple/",
           "-m",
           "mindm_mcp.server"
         ],
@@ -165,14 +166,13 @@ The server exposes the following tools through the Model Context Protocol:
 This MCP server can be installed in Claude Desktop or other MCP-compatible applications, allowing LLMs to:
 
 1. Access mindmap content
-2. Manipulate mindmaps
-3. Create new mindmaps based on LLM-generated content
+2. Manipulate mindmaps (coming)
+3. Create new mindmaps based on LLM-generated content (coming)
 
 ## Troubleshooting
 
 - Ensure MindManager is running before starting the server
 - For macOS, make sure you allow Claude Desktop to automate MindManager
-- Check that the correct MindManager version (23-26) is installed
 
 ## Acknowledgements
 

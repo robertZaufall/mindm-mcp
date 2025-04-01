@@ -349,7 +349,7 @@ wheels = [
 
 [[package]]
 name = "mindm"
-version = "0.0.4.2"
+version = "0.0.4.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "appscript", marker = "sys_platform == 'darwin'" },
@@ -358,14 +358,14 @@ dependencies = [
     { name = "pywin32", marker = "sys_platform == 'win32'" },
     { name = "regex" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/88/c4/f5250affa54439230e7d33bfb88ce62442b6cb9dfa5a8c3eb2c7a8b905ff/mindm-0.0.4.2.tar.gz", hash = "sha256:c2519440875eedbf4c8907b8b1819e593bab5905d3305cb7eabb3371c2827bb3", size = 27424 }
+sdist = { url = "https://files.pythonhosted.org/packages/77/50/61f8bcb71d8e03a7eb44e451882396e20a529f05cbcb351d19b902f652b7/mindm-0.0.4.6.tar.gz", hash = "sha256:afae364e171dcad378e22bf69393360b7e535dbe2d75c87e892780787b18edd9", size = 27748 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/8d/9942724279128c9762a52d54e0a7b0b19ba8b3b05bfb9f46727642eb91d9/mindm-0.0.4.2-py3-none-any.whl", hash = "sha256:f2af5a34c44614f479d51a474447012046958697ae120a6a84384cd4c41e42e8", size = 29803 },
+    { url = "https://files.pythonhosted.org/packages/34/aa/bb2c1f0de021503d50f4700bff8229bfdb6bb4e5a624b4ff7c4c682ab059/mindm-0.0.4.6-py3-none-any.whl", hash = "sha256:d047293302f987f7466f9ae62b5636ab5bc378e2804b10df722892993e1d607e", size = 29857 },
 ]
 
 [[package]]
 name = "mindm-mcp"
-version = "0.0.1.41"
+version = "0.0.1.56"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -384,7 +384,7 @@ requires-dist = [
     { name = "build", specifier = ">=1.2.2.post1" },
     { name = "fastmcp", specifier = ">=0.4.1" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.6.0" },
-    { name = "mindm", specifier = ">=0.0.4.2" },
+    { name = "mindm", specifier = ">=0.0.4.6" },
     { name = "pydantic", specifier = ">=1.10.7" },
     { name = "uvicorn", specifier = ">=0.22.0" },
     { name = "websockets", specifier = ">=10.4" },

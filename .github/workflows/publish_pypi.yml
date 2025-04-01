@@ -14,7 +14,7 @@ jobs:
       name: pypi
       url: https://pypi.org/p/mindm-mcp
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - name: Checkout repository
@@ -41,12 +41,7 @@ jobs:
 
       - name: Create GitHub Release
         if: github.event_name == 'push'
-        id: create_release
-        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: ${{ github.ref_name }}
-          draft: false
-          prerelease: false
+        run: |
+          gh release create ${{ github.ref_name }} --title "${{ github.ref_name }}" --generate-notes

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mindm_mcp"
-version = "0.0.1.61"
+version = "0.0.1.62"
 authors = [
   { name="Robert Zaufall" },
 ]

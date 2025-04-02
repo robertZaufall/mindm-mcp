@@ -17,7 +17,8 @@ from mcp.server.fastmcp import FastMCP, Context
 
 from mindmap.mindmap import MindmapDocument, MindmapTopic
 from mindmap import serialization, helpers
-import mindm.mindmanager as mm
+import mindm
+from mindm import mindmanager as mm
 
 try:
     from importlib.metadata import version as _version
@@ -198,6 +199,23 @@ async def get_library_folder(
 
 
 @mcp.tool()
+async def get_mindmanager_version(
+) -> Union[str, Dict[str, str]]:
+    """
+    Gets the version of the MindManager application.
+
+    Returns:
+        Union[str, Dict[str, str]]: The version of the MindManager application or error dictionary.
+    """
+    try:
+        version = mm.Mindmanager().get_version()
+        print(f"get_mindmanager_version() returned: {version}", file=sys.stderr)
+        return version
+    except Exception as e:
+        return _handle_mindmanager_error("get_mindmanager_version", e)
+
+
+@mcp.tool()
 async def get_grounding_information(
     mode: str = 'full',
     turbo_mode: bool = False
@@ -304,6 +322,20 @@ async def serialize_current_mindmap_to_json(
     except Exception as e:
         print(f"ERROR during serialization to JSON: {e}", file=sys.stderr)
         return {"error": "Serialization Error", "message": f"Failed to serialize to JSON: {e}"}
+
+
+@mcp.tool()
+async def get_versions() -> Dict[str, str]:
+    """
+    Get the versions of the MindManager Automation MCP Server components.
+
+    Returns:
+        Dict[str, str]: A dictionary containing the versions of the components.
+    """
+    result = {}
+    result["mindm-mcp"] = __version__
+    result["mindm"] = mindm.__version__
+    return result
 
 
 def main():

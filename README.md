@@ -2,8 +2,8 @@
 
 A Model Context Protocol (MCP) server implementation for the `mindm` library, providing a standardized interface to interact with MindManager on Windows and macOS.  
 
-[![PyPI version](https://img.shields.io/pypi/v/mindm-mcp.svg)](https://pypi.org/project/mindm-mcp/)
-[![PyPI version](https://img.shields.io/pypi/v/mindm.svg)](https://pypi.org/project/mindm/)
+[![PyPI version](https://img.shields.io/pypi/v/mindm-mcp.svg?label=pypi%20(mindm-mcp)&style=for-the-badge&color=blue)](https://pypi.org/project/mindm-mcp/)
+[![PyPI version](https://img.shields.io/pypi/v/mindm.svg?label=pypi%20(mindm)&style=for-the-badge&color=lightblue)](https://pypi.org/project/mindm/)
 
 ## Overview
 

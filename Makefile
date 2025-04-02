@@ -37,7 +37,7 @@ release:
 
 # Call inspector
 inspector:
-	uv run --with mind --with fastmcp --with markdown-it-py mcp dev mindm_mcp/server.py
+	uv run --with mindm --with fastmcp --with markdown-it-py mcp dev mindm_mcp/server.py
 # npx @modelcontextprotocol/inspector uv --directory . run 
 
 # Help

@@ -174,6 +174,10 @@ This MCP server can be installed in Claude Desktop or other MCP-compatible appli
 - Ensure MindManager is running before starting the server
 - For macOS, make sure you allow Claude Desktop to automate MindManager
 
+## MCPHub
+
+[Certified on MCPHub](https://mcphub.com/mcp-servers/robertZaufall/mindm-mcp)
+
 ## Acknowledgements
 
 This project is built upon the `mindm` library, providing Python interfaces to MindManager on Windows and macOS platforms. It uses the Model Context Protocol (MCP) SDK developed by Anthropic.

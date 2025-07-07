@@ -6,7 +6,7 @@ on:
     types: [created]
   push:
     tags:
-      - 'v0*'
+      - 'v*'
 jobs:
   build-and-publish:
     runs-on: windows-latest

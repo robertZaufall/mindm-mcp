@@ -160,9 +160,9 @@ Hint: If the MCP server does not show up with the hammer icon on Windows, close 
 
 ### Codex (VSCode Extension / CLI)
 
-#### Local python file (`config.toml`)
+#### Local python file
 
-Adjust the path for the local file as needed.
+`config.toml` (adjust the path for the local file as needed).
 ```
 [features]
 rmcp_client = true
@@ -174,7 +174,7 @@ args = ["run", "--with", "mindm>=0.0.5.2", "--with", "fastmcp", "--with", "markd
 
 ### VSCode Chat (GitHub Copilot)
 
-#### Local python file (`config.toml`)
+#### Local python file:
 
 Adjust the path for the local file as needed.
 ```

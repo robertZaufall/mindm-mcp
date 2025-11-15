@@ -132,7 +132,7 @@ Adjust the path for the local file as needed.
       "args": [
         "run",
         "--with",
-        "mindm>=0.0.5.2",
+        "mindm>=0.0.5.3",
         "--with",
         "fastmcp",
         "--with",
@@ -155,9 +155,9 @@ Adjust `VIRTUAL_ENV` as needed.
         "args": [
           "run",
           "--with",
-          "mindm>=0.0.5.2",
+          "mindm>=0.0.5.3",
           "--with",
-          "mindm-mcp>=0.0.2.0",
+          "mindm-mcp>=0.0.2.1",
           "--with",
           "fastmcp",
           "--with",
@@ -177,29 +177,85 @@ Hint: If the MCP server does not show up with the hammer icon on Windows, close 
 
 ### Codex (VSCode Extension / CLI)
 
-#### Local python file (`config.toml`)
+#### Local python file
 
-Adjust the path for the local file as needed.
+`config.toml` (adjust the path for the local file as needed).
 ```
 [features]
 rmcp_client = true
 
 [mcp_servers.mindmanager]
 command = "uv"
-args = ["run", "--with", "mindm>=0.0.5.2", "--with", "fastmcp", "--with", "markdown-it-py", "/Users/master/git/mindm-mcp/mindm_mcp/server.py"]
+args = ["run", "--with", "mindm>=0.0.5.3", "--with", "fastmcp", "--with", "markdown-it-py", "/Users/master/git/mindm-mcp/mindm_mcp/server.py"]
+
+```
+
+#### Module from package repository
+
+`config.toml` 
+```
+[features]
+rmcp_client = true
+
+[mcp_servers.mindmanager]
+command = "uv"
+args = ["run", "--with", "mindm>=0.0.5.3", "--with", "fastmcp", "--with", "markdown-it-py", "--with", "mindm-mcp>=0.0.2.1", "-m", "mindm_mcp.server"]
+
 ```
 
 ### VSCode Chat (GitHub Copilot)
 
-#### Local python file (`config.toml`)
+#### Local python file:
 
 Adjust the path for the local file as needed.
 ```
-uv run --with mindm>=0.0.5.2 --with fastmcp --with markdown-it-py /Users/master/git/mindm-mcp/mindm_mcp/server.py
+uv run --with mindm>=0.0.5.3 --with fastmcp --with markdown-it-py /Users/master/git/mindm-mcp/mindm_mcp/server.py
+```
+ 
+or server definition in `mcp.json`:
+```
+		"Mindmanager": {
+			"type": "stdio",
+			"command": "uv",
+			"args": [
+				"run",
+				"--with",
+				"mindm>=0.0.5.3",
+				"--with",
+				"fastmcp",
+				"--with",
+				"markdown-it-py",
+				"/Users/master/git/mindm-mcp/mindm_mcp/server.py"
+			]
+		}
 ```
 
-![VSCode chat](https://github.com/robertZaufall/mindm-mcp/blob/master/assets/vscode_chat_settings.png?raw=true)
+#### Module from package repository
 
+```
+uv run --with mindm>=0.0.5.3 --with fastmcp --with markdown-it-py --with mindm-mcp>=0.0.2.1 -m mindm_mcp.server
+```
+
+or server definition in `mcp.json`:
+```
+		"Mindmanager": {
+			"type": "stdio",
+			"command": "uv",
+			"args": [
+				"run",
+				"--with",
+				"mindm>=0.0.5.3",
+				"--with",
+				"fastmcp",
+				"--with",
+				"markdown-it-py",
+				"--with",
+				"mindm-mcp>=0.0.2.1",
+				"-m",
+				"mindm_mcp.server"
+			]
+		}
+```
 
 ## MCP Tools
 
@@ -293,7 +349,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mindm_mcp"
-version = "0.0.2.1"
+version = "0.0.2.2"
 authors = [
   { name="Robert Zaufall" },
 ]
@@ -308,7 +364,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "mindm>=0.0.5.2",
+  "mindm>=0.0.5.3",
   "uvicorn>=0.22.0",
   "aiohttp>=3.8.4",
   "pydantic>=1.10.7",
@@ -340,7 +396,7 @@ FILE: assets/claude_desktop_config.1.json
         "args": [
           "run",
           "--with",
-          "mindm>=0.0.5.2",
+          "mindm>=0.0.5.3",
           "--with",
           "mindm-mcp>=0.0.2.0",
           "--with",
@@ -369,7 +425,7 @@ FILE: assets/claude_desktop_config.2.json
         "args": [
           "run",
           "--with",
-          "mindm>=0.0.5.2",
+          "mindm>=0.0.5.3",
           "--with",
           "fastmcp",
           "--with",

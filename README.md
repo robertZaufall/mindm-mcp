@@ -115,7 +115,7 @@ Adjust the path for the local file as needed.
       "args": [
         "run",
         "--with",
-        "mindm>=0.0.5.2",
+        "mindm>=0.0.5.3",
         "--with",
         "fastmcp",
         "--with",
@@ -138,9 +138,9 @@ Adjust `VIRTUAL_ENV` as needed.
         "args": [
           "run",
           "--with",
-          "mindm>=0.0.5.2",
+          "mindm>=0.0.5.3",
           "--with",
-          "mindm-mcp>=0.0.2.0",
+          "mindm-mcp>=0.0.2.1",
           "--with",
           "fastmcp",
           "--with",
@@ -169,7 +169,21 @@ rmcp_client = true
 
 [mcp_servers.mindmanager]
 command = "uv"
-args = ["run", "--with", "mindm>=0.0.5.2", "--with", "fastmcp", "--with", "markdown-it-py", "/Users/master/git/mindm-mcp/mindm_mcp/server.py"]
+args = ["run", "--with", "mindm>=0.0.5.3", "--with", "fastmcp", "--with", "markdown-it-py", "/Users/master/git/mindm-mcp/mindm_mcp/server.py"]
+
+```
+
+#### Module from package repository
+
+`config.toml` 
+```
+[features]
+rmcp_client = true
+
+[mcp_servers.mindmanager]
+command = "uv"
+args = ["run", "--with", "mindm>=0.0.5.3", "--with", "fastmcp", "--with", "markdown-it-py", "--with", "mindm-mcp>=0.0.2.1", "-m", "mindm_mcp.server"]
+
 ```
 
 ### VSCode Chat (GitHub Copilot)
@@ -178,11 +192,53 @@ args = ["run", "--with", "mindm>=0.0.5.2", "--with", "fastmcp", "--with", "markd
 
 Adjust the path for the local file as needed.
 ```
-uv run --with mindm>=0.0.5.2 --with fastmcp --with markdown-it-py /Users/master/git/mindm-mcp/mindm_mcp/server.py
+uv run --with mindm>=0.0.5.3 --with fastmcp --with markdown-it-py /Users/master/git/mindm-mcp/mindm_mcp/server.py
+```
+ 
+or server definition in `mcp.json`:
+```
+		"Mindmanager": {
+			"type": "stdio",
+			"command": "uv",
+			"args": [
+				"run",
+				"--with",
+				"mindm>=0.0.5.3",
+				"--with",
+				"fastmcp",
+				"--with",
+				"markdown-it-py",
+				"/Users/master/git/mindm-mcp/mindm_mcp/server.py"
+			]
+		}
 ```
 
-![VSCode chat](https://github.com/robertZaufall/mindm-mcp/blob/master/assets/vscode_chat_settings.png?raw=true)
+#### Module from package repository
 
+```
+uv run --with mindm>=0.0.5.3 --with fastmcp --with markdown-it-py --with mindm-mcp>=0.0.2.1 -m mindm_mcp.server
+```
+
+or server definition in `mcp.json`:
+```
+		"Mindmanager": {
+			"type": "stdio",
+			"command": "uv",
+			"args": [
+				"run",
+				"--with",
+				"mindm>=0.0.5.3",
+				"--with",
+				"fastmcp",
+				"--with",
+				"markdown-it-py",
+				"--with",
+				"mindm-mcp>=0.0.2.1",
+				"-m",
+				"mindm_mcp.server"
+			]
+		}
+```
 
 ## MCP Tools
 

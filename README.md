@@ -9,13 +9,18 @@ A Model Context Protocol (MCP) server implementation for the `mindm` library, pr
 
 This server allows you to programmatically interact with MindManager through the Model Context Protocol (MCP), a standardized way to provide context and tools to LLMs. It leverages the `mindm` library to manipulate MindManager documents, topics, relationships, and other mindmap elements.
 
-Example (Claude desktop):
+### Animated examples (using Codex in VSCode on Windows)
 
-![MindManager MCP in Claude](https://github.com/robertZaufall/mindm-mcp/blob/master/assets/claude.png?raw=true)
+Cloning a map including all supported topic properties:
+![MindManager MCP in Codex](assets/clone_map_anim.gif) 
+ 
+Refining a single topic including generating text in notes for the new topics: 
+![MindManager MCP in Codex](assets/refine_map_anim.gif) 
 
-Example (Codex GUI):
+### Example (Codex GUI in VSCode on macOS):
 
-![MindManager MCP in Codex](https://github.com/robertZaufall/mindm-mcp/blob/master/assets/codex_gui.png?raw=true)
+Adding emojis to all topics: 
+![MindManager MCP in Codex](assets/codex_gui.png)
 
 ## Other examples
 

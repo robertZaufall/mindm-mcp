@@ -268,6 +268,40 @@ The server exposes the following tools through the Model Context Protocol:
 ### Versioning
 - `get_versions`: Returns the `mindm-mcp` and `mindm` package versions for debugging
 
+## Example for full mermaid format 
+
+This is the serialized `Test_DOM.mmap` file from the mindm repo, including `id` (for referencing), `links`, `tags`, `notes`, `images`, `icons`, `references`:
+```text
+mindmap
+  [Test] %% {"id": 1}
+    [1] %% {"id": 2, "links": [{"text": "Microsoft", "url": "https://www.microsoft.com"}], "references": [{"id_1": 2, "id_2": 6, "direction": 1}]}
+      [11] %% {"id": 3}
+        [111] %% {"id": 4}
+      [12] %% {"id": 5}
+    [4] %% {"id": 6, "image": {"text": "C:\\Users\\master\\AppData\\Local\\Temp\\tmpdh6rg4t6.png"}, "references": [{"id_1": 2, "id_2": 6, "direction": 2}]}
+    [2] %% {"id": 7, "notes": {"text": "Notes for 2"}}
+    [3] %% {"id": 8}
+    [5] %% {"id": 9}
+    [6] %% {"id": 10, "icons": [{"text": "StockIcon-44", "is_stock_icon": true, "index": 44}]}
+    [Main Topic] %% {"id": 11, "icons": [{"text": "StockIcon-36", "is_stock_icon": true, "index": 36}], "tags": ["Tag1"]}
+```
+
+The mermaid still renders nicely:
+
+```mermaid
+mindmap
+  [Test] %% {"id": 1}
+    [1] %% {"id": 2, "links": [{"text": "Microsoft", "url": "https://www.microsoft.com"}], "references": [{"id_1": 2, "id_2": 6, "direction": 1}]}
+      [11] %% {"id": 3}
+        [111] %% {"id": 4}
+      [12] %% {"id": 5}
+    [4] %% {"id": 6, "image": {"text": "C:\\Users\\master\\AppData\\Local\\Temp\\tmpdh6rg4t6.png"}, "references": [{"id_1": 2, "id_2": 6, "direction": 2}]}
+    [2] %% {"id": 7, "notes": {"text": "Notes for 2"}}
+    [3] %% {"id": 8}
+    [5] %% {"id": 9}
+    [6] %% {"id": 10, "icons": [{"text": "StockIcon-44", "is_stock_icon": true, "index": 44}]}
+    [Main Topic] %% {"id": 11, "icons": [{"text": "StockIcon-36", "is_stock_icon": true, "index": 36}], "tags": ["Tag1"]}
+```
 
 ## Platform Support
 

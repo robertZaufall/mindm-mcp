@@ -5,9 +5,9 @@
         "args": [
           "run",
           "--with",
-          "mindm>=0.0.4.6",
+          "mindm>=0.0.5.2",
           "--with",
-          "mindm-mcp>=0.0.1.42",
+          "mindm-mcp>=0.0.2.0",
           "--with",
           "fastmcp",
           "--with",

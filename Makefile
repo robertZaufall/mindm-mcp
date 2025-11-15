@@ -19,10 +19,10 @@ build:
 install:
 	uv pip install -e .
 
-# Generate documentation
+# llms
 llms:
 	uv pip install gitingest
-	gitingest . -o llms.txt -i "pyproject.toml,update_version.py,LICENSE,README.md,examples/*,mindm_mcp/*,assets/*.json" -e "llms.txt,mindm_mcp/__pycache__,mindm_mcp/.DS_Store,mindmap/.DS.Store,assets/archive/*"
+	gitingest . -o llms.txt -i "pyproject.toml,LICENSE,README.md,examples/*,mindm_mcp/*,assets/*.json" -e "llms.txt,,update_version.pymindm_mcp/__pycache__,mindm_mcp/.DS_Store,mindmap/.DS.Store,assets/archive/*"
 
 # Create a release on Github
 release:

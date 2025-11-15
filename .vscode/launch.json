@@ -1,0 +1,13 @@
+{
+    // Run MCP dev server with uv to ensure optional dependencies are present
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "MCP Dev Server (uv)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "uv run --with mind --with fastmcp --with markdown-it-py mcp dev mindm_mcp/server.py",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

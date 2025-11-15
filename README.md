@@ -17,13 +17,14 @@ Example:
 
 - Retrieve mindmap structure and central topics
 - Export mindmaps to Mermaid, Markdown, JSON formats to be used in LLM chats
+- Create MindManager mindmaps directly from Mermaid (full or simplified syntax)
+- Fetch MindManager and package versions for quick diagnostics
 - Get information about MindManager installation and library folders
 - Get current selection from MindManager
 
 ## Planned Features
 
-- Create new mindmaps from serialized data
-- Add, modify, and manipulate topics and subtopics
+- Add, modify, and manipulate topics and subtopics without Mermaid roundtrips
 - Add relationships between topics
 - Add tags to topics
 - Set document background images
@@ -96,7 +97,7 @@ Adjust the path for the local file as needed.
       "args": [
         "run",
         "--with",
-        "mindm>=0.0.4.6",
+        "mindm>=0.0.5.2",
         "--with",
         "fastmcp",
         "--with",
@@ -119,9 +120,9 @@ Adjust `VIRTUAL_ENV` as needed.
         "args": [
           "run",
           "--with",
-          "mindm>=0.0.4.6",
+          "mindm>=0.0.5.2",
           "--with",
-          "mindm-mcp>=0.0.1.50",
+          "mindm-mcp>=0.0.2.0",
           "--with",
           "fastmcp",
           "--with",
@@ -133,12 +134,34 @@ Adjust `VIRTUAL_ENV` as needed.
             "VIRTUAL_ENV": "/Users/master/git/mindm-mcp/.venv"
         }
       }
-    }
+  }
 }
 ```
 
 Hint: If the MCP server does not show up with the hammer icon on Windows, close Claude Desktop and kill all background processes.  
 
+### Codex (VSCode Exension / CLI)
+
+#### Local python file (`config.toml`)
+
+Adjust the path for the local file as needed.
+```
+[features]
+rmcp_client = true
+
+[mcp_servers.mindmanager]
+command = "uv"
+args = ["run", "--with", "mindm>=0.0.5.2", "--with", "fastmcp", "--with", "markdown-it-py", "/Users/master/git/mindm-mcp/mindm_mcp/server.py"]
+```
+
+### VSCode Chat (GitHub Copilot)
+
+#### Local python file (`config.toml`)
+
+Adjust the path for the local file as needed.
+```
+uv run --with mindm>=0.0.5.2 --with fastmcp --with markdown-it-py /Users/master/git/mindm-mcp/mindm_mcp/server.py
+```
 
 ## MCP Tools
 
@@ -148,12 +171,20 @@ The server exposes the following tools through the Model Context Protocol:
 - `get_mindmap`: Retrieves the current mindmap structure from MindManager
 - `get_selection`: Retrieves the currently selected topics in MindManager
 - `get_library_folder`: Gets the path to the MindManager library folder
+- `get_mindmanager_version`: Gets the installed MindManager version
 - `get_grounding_information`: Extracts grounding information (central topic, selected subtopics) from the mindmap
 
 ### Serialization
 - `serialize_current_mindmap_to_mermaid`: Serializes the currently loaded mindmap to Mermaid format
 - `serialize_current_mindmap_to_markdown`: Serializes the currently loaded mindmap to Markdown format
 - `serialize_current_mindmap_to_json`: Serializes the currently loaded mindmap to a detailed JSON object with ID mapping
+
+### Creation
+- `create_mindmap_from_mermaid`: Build a MindManager map from Mermaid (full syntax with IDs and metadata)
+- `create_mindmap_from_mermaid_simple`: Build a MindManager map from simplified Mermaid text
+
+### Versioning
+- `get_versions`: Returns the `mindm-mcp` and `mindm` package versions for debugging
 
 
 ## Platform Support

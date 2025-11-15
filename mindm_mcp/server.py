@@ -27,8 +27,28 @@ except ImportError:
     __version__ = "unknown"
 
 # --- Globals ---
-# Initialize the MCP server
-mcp = FastMCP("mindm (MindManager)", version=__version__)
+SERVER_NAME = "mindm (MindManager)"
+
+
+def _create_mcp_server() -> FastMCP:
+    """
+    Instantiate FastMCP while remaining compatible with versions of the MCP
+    package that don't support the `version` keyword argument.
+    """
+    try:
+        return FastMCP(SERVER_NAME, version=__version__)
+    except TypeError as exc:
+        if "unexpected keyword argument 'version'" not in str(exc):
+            raise
+        print(
+            "FastMCP does not accept a 'version' argument; continuing without it.",
+            file=sys.stderr,
+        )
+        return FastMCP(SERVER_NAME)
+
+
+# Initialize the MCP server (handles FastMCP compatibility automatically)
+mcp = _create_mcp_server()
 
 doc_lock = asyncio.Lock()
 
@@ -87,8 +107,8 @@ def _get_selection(mode='content', turbo_mode=False):
         return selection
     return None
 
-def _get_grounding_information(mode='text', turbo_mode=False):
-    document = _get_document_instance(turbo_mode=True)
+def _get_grounding_information(mode='text', turbo_mode=True):
+    document = _get_document_instance(turbo_mode=turbo_mode)
     if document.get_mindmap(mode=mode):
         document.get_selection()
         return document.get_grounding_information()
@@ -109,8 +129,23 @@ def _serialize_mermaid(id_only=True, mode='content', turbo_mode=False):
         return mermaid
     return None
 
+def _deserialize_mermaid(mermaid="", turbo_mode=True):
+    guid_mapping = {}
+    deserialized = serialization.deserialize_mermaid_full(mermaid, guid_mapping)
+    document = _get_document_instance(turbo_mode=turbo_mode)
+    document.mindmap = deserialized
+    document.create_mindmap()
+    return None
+
+def _deserialize_mermaid_simple(mermaid="", turbo_mode=True):
+    deserialized = serialization.deserialize_mermaid_simple(mermaid)
+    document = _get_document_instance(turbo_mode=turbo_mode)
+    document.mindmap = deserialized
+    document.create_mindmap()
+    return None
+
 def _serialize_markdown(include_notes=True, mode='content', turbo_mode=False):
-    document = _get_document_instance(turbo_mode=True)
+    document = _get_document_instance(turbo_mode=turbo_mode)
     if document.get_mindmap(mode=mode):
         markdown = serialization.serialize_mindmap_markdown(document.mindmap, include_notes=include_notes)
         return markdown
@@ -322,6 +357,62 @@ async def serialize_current_mindmap_to_json(
     except Exception as e:
         print(f"ERROR during serialization to JSON: {e}", file=sys.stderr)
         return {"error": "Serialization Error", "message": f"Failed to serialize to JSON: {e}"}
+
+
+# == Deserialization Methods (Applying Mermaid to MindManager) ==
+
+@mcp.tool()
+async def create_mindmap_from_mermaid(
+    mermaid: str,
+    turbo_mode: bool = True
+) -> Dict[str, str]:
+    """
+    Deserializes a Mermaid mindmap and creates a MindManager mindmap from it.
+
+    Args:
+        mermaid (str): Mermaid text describing the desired mindmap.
+        turbo_mode (bool): Enable turbo mode (text-only operations). Defaults to True.
+
+    Returns:
+        Dict[str, str]: Status dictionary indicating success or error details.
+    """
+    if not mermaid or not mermaid.strip():
+        return {"error": "Invalid Input", "message": "Mermaid content is required."}
+
+    try:
+        print("Creating mindmap from Mermaid diagram (full).", file=sys.stderr)
+        _deserialize_mermaid(mermaid=mermaid, turbo_mode=turbo_mode)
+        print("Mindmap created from Mermaid diagram.", file=sys.stderr)
+        return {"status": "success", "message": "Mindmap created from Mermaid diagram."}
+    except Exception as e:
+        return _handle_mindmanager_error("create_mindmap_from_mermaid", e)
+
+
+@mcp.tool()
+async def create_mindmap_from_mermaid_simple(
+    mermaid: str,
+    turbo_mode: bool = True
+) -> Dict[str, str]:
+    """
+    Deserializes a Mermaid mindmap in simplified syntax and creates a MindManager mindmap from it.
+
+    Args:
+        mermaid (str): Mermaid text describing the desired mindmap.
+        turbo_mode (bool): Enable turbo mode (text-only operations). Defaults to True.
+
+    Returns:
+        Dict[str, str]: Status dictionary indicating success or error details.
+    """
+    if not mermaid or not mermaid.strip():
+        return {"error": "Invalid Input", "message": "Mermaid content is required."}
+
+    try:
+        print("Creating mindmap from Mermaid diagram (simple).", file=sys.stderr)
+        _deserialize_mermaid_simple(mermaid=mermaid, turbo_mode=turbo_mode)
+        print("Mindmap created from Mermaid diagram (simple).", file=sys.stderr)
+        return {"status": "success", "message": "Mindmap created from Mermaid diagram (simple)."}
+    except Exception as e:
+        return _handle_mindmanager_error("create_mindmap_from_mermaid_simple", e)
 
 
 @mcp.tool()

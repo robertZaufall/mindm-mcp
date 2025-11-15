@@ -11,4 +11,4 @@ venv
 dist/
 out/
 docs/_build/
-.repomix/
+uv.lock

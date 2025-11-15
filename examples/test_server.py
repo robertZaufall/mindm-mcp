@@ -7,6 +7,45 @@ from typing import Any, Dict, List, Union
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import mindm_mcp.server as server
 
+
+MERMAID_FULL_EXAMPLE = """
+mindmap
+  [Creating an AI startup] %% {"id": 1}
+    [Vision & Strategy] %% {"id": 2}
+      [Mission and Value] %% {"id": 3}
+        [Problem statement] %% {"id": 4}
+        [Value proposition] %% {"id": 5}
+        [Long term goals] %% {"id": 6}
+      [Competitive Positioning] %% {"id": 7}
+        [Differentiation pillars] %% {"id": 8}
+        [Key competitors map] %% {"id": 9}
+        [Barrier strategies] %% {"id": 10}
+    [Product & Tech] %% {"id": 19}
+      [MVP Design] %% {"id": 20}
+        [Core feature set] %% {"id": 21}
+        [User flows map] %% {"id": 22}
+        [Rapid prototyping] %% {"id": 23}
+"""
+
+MERMAID_SIMPLE_EXAMPLE = """
+mindmap
+  Creating an AI startup
+    Vision & Strategy
+      Mission and Value
+        Problem statement
+        Value proposition
+        Long term goals
+      Competitive Positioning
+        Differentiation pillars
+        Key competitors map
+        Barrier strategies
+    Product & Tech
+      MVP Design
+        Core feature set
+        User flows map
+        Rapid prototyping
+"""
+
 async def call_get_mindmap():
     """Calls server.get_mindmap with different parameters."""
     print("\n--- Testing get_mindmap ---")
@@ -86,6 +125,26 @@ async def call_serialize_current_mindmap_to_json():
                 result = await server.serialize_current_mindmap_to_json(ignore_rtf=ignore_rtf, mode=mode, turbo_mode=turbo_mode)
                 print(f"Result: {json.dumps(result, indent=2)}")
 
+async def call_create_mindmap_from_mermaid():
+    """Calls server.create_mindmap_from_mermaid with an example diagram."""
+    print("\n--- Testing create_mindmap_from_mermaid ---")
+    print("Calling create_mindmap_from_mermaid(turbo_mode=True)")
+    result = await server.create_mindmap_from_mermaid(
+        mermaid=MERMAID_FULL_EXAMPLE,
+        turbo_mode=True,
+    )
+    print(f"Result: {json.dumps(result, indent=2)}")
+
+async def call_create_mindmap_from_mermaid_simple():
+    """Calls server.create_mindmap_from_mermaid_simple with an example diagram."""
+    print("\n--- Testing create_mindmap_from_mermaid_simple ---")
+    print("Calling create_mindmap_from_mermaid_simple(turbo_mode=True)")
+    result = await server.create_mindmap_from_mermaid_simple(
+        mermaid=MERMAID_SIMPLE_EXAMPLE,
+        turbo_mode=True,
+    )
+    print(f"Result: {json.dumps(result, indent=2)}")
+
 
 async def main():
     """Calls all the test functions."""
@@ -96,6 +155,8 @@ async def main():
     await call_serialize_current_mindmap_to_mermaid()
     await call_serialize_current_mindmap_to_markdown()
     await call_serialize_current_mindmap_to_json()
+    await call_create_mindmap_from_mermaid()
+    await call_create_mindmap_from_mermaid_simple()
 
 if __name__ == "__main__":
     # Check if MindManager is running before running the tests

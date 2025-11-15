@@ -9,9 +9,27 @@ A Model Context Protocol (MCP) server implementation for the `mindm` library, pr
 
 This server allows you to programmatically interact with MindManager through the Model Context Protocol (MCP), a standardized way to provide context and tools to LLMs. It leverages the `mindm` library to manipulate MindManager documents, topics, relationships, and other mindmap elements.
 
-Example:
+Example (Claude desktop):
 
 ![MindManager MCP in Claude](https://github.com/robertZaufall/mindm-mcp/blob/master/assets/claude.png?raw=true)
+
+Example (Codex GUI):
+
+![MindManager MCP in Codex](https://github.com/robertZaufall/mindm-mcp/blob/master/assets/codex_gui.png?raw=true)
+
+## Other examples
+
+### Client
+
+`get the current MindManager mindmap, translate every topic to German and create a new MindManager mindmap (simple).` 
+ 
+`get the current MindManager mindmap, refine each topic 2 levels and create a new MindManager mindmap (simple).` 
+
+### Shell:
+
+`codex exec "get the current MindManager mindmap, add a meaningful emoji to every topic and create new MindManager mindmap (simple)"` 
+
+_remark: emojis only work on macOS._ 
 
 ## Features
 
@@ -140,7 +158,7 @@ Adjust `VIRTUAL_ENV` as needed.
 
 Hint: If the MCP server does not show up with the hammer icon on Windows, close Claude Desktop and kill all background processes.  
 
-### Codex (VSCode Exension / CLI)
+### Codex (VSCode Extension / CLI)
 
 #### Local python file (`config.toml`)
 
@@ -162,6 +180,9 @@ Adjust the path for the local file as needed.
 ```
 uv run --with mindm>=0.0.5.2 --with fastmcp --with markdown-it-py /Users/master/git/mindm-mcp/mindm_mcp/server.py
 ```
+
+![VSCode chat](https://github.com/robertZaufall/mindm-mcp/blob/master/assets/vscode_chat_settings.png?raw=true)
+
 
 ## MCP Tools
 

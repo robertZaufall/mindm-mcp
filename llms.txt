@@ -3,7 +3,9 @@ Directory structure:
     ├── README.md
     ├── LICENSE
     ├── pyproject.toml
-    ├── update_version.py
+    ├── assets/
+    │   ├── claude_desktop_config.1.json
+    │   └── claude_desktop_config.2.json
     ├── examples/
     │   └── test_server.py
     └── mindm_mcp/
@@ -11,7 +13,7 @@ Directory structure:
         └── server.py
 
 ================================================
-File: README.md
+FILE: README.md
 ================================================
 # MindManager MCP Server
 
@@ -24,21 +26,40 @@ A Model Context Protocol (MCP) server implementation for the `mindm` library, pr
 
 This server allows you to programmatically interact with MindManager through the Model Context Protocol (MCP), a standardized way to provide context and tools to LLMs. It leverages the `mindm` library to manipulate MindManager documents, topics, relationships, and other mindmap elements.
 
-Example:
+Example (Claude desktop):
 
 ![MindManager MCP in Claude](https://github.com/robertZaufall/mindm-mcp/blob/master/assets/claude.png?raw=true)
+
+Example (Codex GUI):
+
+![MindManager MCP in Codex](https://github.com/robertZaufall/mindm-mcp/blob/master/assets/codex_gui.png?raw=true)
+
+## Other examples
+
+### Client
+
+`get the current MindManager mindmap, translate every topic to German and create a new MindManager mindmap (simple).` 
+ 
+`get the current MindManager mindmap, refine each topic 2 levels and create a new MindManager mindmap (simple).` 
+
+### Shell:
+
+`codex exec "get the current MindManager mindmap, add a meaningful emoji to every topic and create new MindManager mindmap (simple)"` 
+
+_remark: emojis only work on macOS._ 
 
 ## Features
 
 - Retrieve mindmap structure and central topics
 - Export mindmaps to Mermaid, Markdown, JSON formats to be used in LLM chats
+- Create MindManager mindmaps directly from Mermaid (full or simplified syntax)
+- Fetch MindManager and package versions for quick diagnostics
 - Get information about MindManager installation and library folders
 - Get current selection from MindManager
 
 ## Planned Features
 
-- Create new mindmaps from serialized data
-- Add, modify, and manipulate topics and subtopics
+- Add, modify, and manipulate topics and subtopics without Mermaid roundtrips
 - Add relationships between topics
 - Add tags to topics
 - Set document background images
@@ -111,7 +132,7 @@ Adjust the path for the local file as needed.
       "args": [
         "run",
         "--with",
-        "mindm>=0.0.4.6",
+        "mindm>=0.0.5.2",
         "--with",
         "fastmcp",
         "--with",
@@ -134,9 +155,9 @@ Adjust `VIRTUAL_ENV` as needed.
         "args": [
           "run",
           "--with",
-          "mindm>=0.0.4.6",
+          "mindm>=0.0.5.2",
           "--with",
-          "mindm-mcp>=0.0.1.50",
+          "mindm-mcp>=0.0.2.0",
           "--with",
           "fastmcp",
           "--with",
@@ -148,11 +169,36 @@ Adjust `VIRTUAL_ENV` as needed.
             "VIRTUAL_ENV": "/Users/master/git/mindm-mcp/.venv"
         }
       }
-    }
+  }
 }
 ```
 
 Hint: If the MCP server does not show up with the hammer icon on Windows, close Claude Desktop and kill all background processes.  
+
+### Codex (VSCode Extension / CLI)
+
+#### Local python file (`config.toml`)
+
+Adjust the path for the local file as needed.
+```
+[features]
+rmcp_client = true
+
+[mcp_servers.mindmanager]
+command = "uv"
+args = ["run", "--with", "mindm>=0.0.5.2", "--with", "fastmcp", "--with", "markdown-it-py", "/Users/master/git/mindm-mcp/mindm_mcp/server.py"]
+```
+
+### VSCode Chat (GitHub Copilot)
+
+#### Local python file (`config.toml`)
+
+Adjust the path for the local file as needed.
+```
+uv run --with mindm>=0.0.5.2 --with fastmcp --with markdown-it-py /Users/master/git/mindm-mcp/mindm_mcp/server.py
+```
+
+![VSCode chat](https://github.com/robertZaufall/mindm-mcp/blob/master/assets/vscode_chat_settings.png?raw=true)
 
 
 ## MCP Tools
@@ -163,12 +209,20 @@ The server exposes the following tools through the Model Context Protocol:
 - `get_mindmap`: Retrieves the current mindmap structure from MindManager
 - `get_selection`: Retrieves the currently selected topics in MindManager
 - `get_library_folder`: Gets the path to the MindManager library folder
+- `get_mindmanager_version`: Gets the installed MindManager version
 - `get_grounding_information`: Extracts grounding information (central topic, selected subtopics) from the mindmap
 
 ### Serialization
 - `serialize_current_mindmap_to_mermaid`: Serializes the currently loaded mindmap to Mermaid format
 - `serialize_current_mindmap_to_markdown`: Serializes the currently loaded mindmap to Markdown format
 - `serialize_current_mindmap_to_json`: Serializes the currently loaded mindmap to a detailed JSON object with ID mapping
+
+### Creation
+- `create_mindmap_from_mermaid`: Build a MindManager map from Mermaid (full syntax with IDs and metadata)
+- `create_mindmap_from_mermaid_simple`: Build a MindManager map from simplified Mermaid text
+
+### Versioning
+- `get_versions`: Returns the `mindm-mcp` and `mindm` package versions for debugging
 
 
 ## Platform Support
@@ -189,6 +243,10 @@ This MCP server can be installed in Claude Desktop or other MCP-compatible appli
 - Ensure MindManager is running before starting the server
 - For macOS, make sure you allow Claude Desktop to automate MindManager
 
+## MCPHub
+
+[Certified on MCPHub](https://mcphub.com/mcp-servers/robertZaufall/mindm-mcp)
+
 ## Acknowledgements
 
 This project is built upon the `mindm` library, providing Python interfaces to MindManager on Windows and macOS platforms. It uses the Model Context Protocol (MCP) SDK developed by Anthropic.
@@ -200,7 +258,7 @@ MIT License - See LICENSE file for details
 
 
 ================================================
-File: LICENSE
+FILE: LICENSE
 ================================================
 MIT License
 
@@ -227,7 +285,7 @@ SOFTWARE.
 
 
 ================================================
-File: pyproject.toml
+FILE: pyproject.toml
 ================================================
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -235,7 +293,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mindm_mcp"
-version = "0.0.1.63"
+version = "0.0.2.1"
 authors = [
   { name="Robert Zaufall" },
 ]
@@ -250,7 +308,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "mindm>=0.0.4.6",
+  "mindm>=0.0.5.2",
   "uvicorn>=0.22.0",
   "aiohttp>=3.8.4",
   "pydantic>=1.10.7",
@@ -273,36 +331,58 @@ packages = ["mindm_mcp"]
 
 
 ================================================
-File: update_version.py
+FILE: assets/claude_desktop_config.1.json
 ================================================
-#!/usr/bin/env python3
-import re
+{
+    "mcpServers": {
+      "mindm (MindManager)": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--with",
+          "mindm>=0.0.5.2",
+          "--with",
+          "mindm-mcp>=0.0.2.0",
+          "--with",
+          "fastmcp",
+          "--with",
+          "markdown-it-py",
+          "-m",
+          "mindm_mcp.server"
+        ],
+        "env": {
+            "VIRTUAL_ENV": "/Users/master/git/mindm-mcp/.venv"
+        }
+      }
+    }
+}
 
-# Read pyproject.toml
-with open("pyproject.toml", "r") as f:
-    content = f.read()
-
-# Find version and update build number
-version_pattern = r'version = "([\d]+)\.([\d]+)\.([\d]+)\.([\d]+)"'
-version_match = re.search(version_pattern, content)
-
-if version_match:
-    major, minor, patch, build = version_match.groups()
-    new_build = str(int(build) + 1)
-    new_version = f"{major}.{minor}.{patch}.{new_build}"
-    new_content = re.sub(version_pattern, f'version = "{new_version}"', content)
-    
-    # Write updated content back
-    with open("pyproject.toml", "w") as f:
-        f.write(new_content)
-    
-    print(f"Updated version to {new_version}")
-else:
-    print("Version pattern not found in pyproject.toml")
 
 
 ================================================
-File: examples/test_server.py
+FILE: assets/claude_desktop_config.2.json
+================================================
+{
+    "mcpServers": {
+      "mindm (MindManager)": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--with",
+          "mindm>=0.0.5.2",
+          "--with",
+          "fastmcp",
+          "--with",
+          "markdown-it-py",
+          "/Users/master/git/mindm-mcp/mindm_mcp/server.py"
+        ]
+      }
+    }
+}
+
+
+================================================
+FILE: examples/test_server.py
 ================================================
 import asyncio
 import json
@@ -312,6 +392,45 @@ from typing import Any, Dict, List, Union
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import mindm_mcp.server as server
+
+
+MERMAID_FULL_EXAMPLE = """
+mindmap
+  [Creating an AI startup] %% {"id": 1}
+    [Vision & Strategy] %% {"id": 2}
+      [Mission and Value] %% {"id": 3}
+        [Problem statement] %% {"id": 4}
+        [Value proposition] %% {"id": 5}
+        [Long term goals] %% {"id": 6}
+      [Competitive Positioning] %% {"id": 7}
+        [Differentiation pillars] %% {"id": 8}
+        [Key competitors map] %% {"id": 9}
+        [Barrier strategies] %% {"id": 10}
+    [Product & Tech] %% {"id": 19}
+      [MVP Design] %% {"id": 20}
+        [Core feature set] %% {"id": 21}
+        [User flows map] %% {"id": 22}
+        [Rapid prototyping] %% {"id": 23}
+"""
+
+MERMAID_SIMPLE_EXAMPLE = """
+mindmap
+  Creating an AI startup
+    Vision & Strategy
+      Mission and Value
+        Problem statement
+        Value proposition
+        Long term goals
+      Competitive Positioning
+        Differentiation pillars
+        Key competitors map
+        Barrier strategies
+    Product & Tech
+      MVP Design
+        Core feature set
+        User flows map
+        Rapid prototyping
+"""
 
 async def call_get_mindmap():
     """Calls server.get_mindmap with different parameters."""
@@ -392,6 +511,26 @@ async def call_serialize_current_mindmap_to_json():
                 result = await server.serialize_current_mindmap_to_json(ignore_rtf=ignore_rtf, mode=mode, turbo_mode=turbo_mode)
                 print(f"Result: {json.dumps(result, indent=2)}")
 
+async def call_create_mindmap_from_mermaid():
+    """Calls server.create_mindmap_from_mermaid with an example diagram."""
+    print("\n--- Testing create_mindmap_from_mermaid ---")
+    print("Calling create_mindmap_from_mermaid(turbo_mode=True)")
+    result = await server.create_mindmap_from_mermaid(
+        mermaid=MERMAID_FULL_EXAMPLE,
+        turbo_mode=True,
+    )
+    print(f"Result: {json.dumps(result, indent=2)}")
+
+async def call_create_mindmap_from_mermaid_simple():
+    """Calls server.create_mindmap_from_mermaid_simple with an example diagram."""
+    print("\n--- Testing create_mindmap_from_mermaid_simple ---")
+    print("Calling create_mindmap_from_mermaid_simple(turbo_mode=True)")
+    result = await server.create_mindmap_from_mermaid_simple(
+        mermaid=MERMAID_SIMPLE_EXAMPLE,
+        turbo_mode=True,
+    )
+    print(f"Result: {json.dumps(result, indent=2)}")
+
 
 async def main():
     """Calls all the test functions."""
@@ -402,6 +541,8 @@ async def main():
     await call_serialize_current_mindmap_to_mermaid()
     await call_serialize_current_mindmap_to_markdown()
     await call_serialize_current_mindmap_to_json()
+    await call_create_mindmap_from_mermaid()
+    await call_create_mindmap_from_mermaid_simple()
 
 if __name__ == "__main__":
     # Check if MindManager is running before running the tests
@@ -418,13 +559,13 @@ if __name__ == "__main__":
 
 
 ================================================
-File: mindm_mcp/__init__.py
+FILE: mindm_mcp/__init__.py
 ================================================
-
+[Empty file]
 
 
 ================================================
-File: mindm_mcp/server.py
+FILE: mindm_mcp/server.py
 ================================================
 #!/usr/bin/env python3
 """
@@ -455,8 +596,28 @@ except ImportError:
     __version__ = "unknown"
 
 # --- Globals ---
-# Initialize the MCP server
-mcp = FastMCP("mindm (MindManager)", version=__version__)
+SERVER_NAME = "mindm (MindManager)"
+
+
+def _create_mcp_server() -> FastMCP:
+    """
+    Instantiate FastMCP while remaining compatible with versions of the MCP
+    package that don't support the `version` keyword argument.
+    """
+    try:
+        return FastMCP(SERVER_NAME, version=__version__)
+    except TypeError as exc:
+        if "unexpected keyword argument 'version'" not in str(exc):
+            raise
+        print(
+            "FastMCP does not accept a 'version' argument; continuing without it.",
+            file=sys.stderr,
+        )
+        return FastMCP(SERVER_NAME)
+
+
+# Initialize the MCP server (handles FastMCP compatibility automatically)
+mcp = _create_mcp_server()
 
 doc_lock = asyncio.Lock()
 
@@ -515,8 +676,8 @@ def _get_selection(mode='content', turbo_mode=False):
         return selection
     return None
 
-def _get_grounding_information(mode='text', turbo_mode=False):
-    document = _get_document_instance(turbo_mode=True)
+def _get_grounding_information(mode='text', turbo_mode=True):
+    document = _get_document_instance(turbo_mode=turbo_mode)
     if document.get_mindmap(mode=mode):
         document.get_selection()
         return document.get_grounding_information()
@@ -537,8 +698,23 @@ def _serialize_mermaid(id_only=True, mode='content', turbo_mode=False):
         return mermaid
     return None
 
+def _deserialize_mermaid(mermaid="", turbo_mode=True):
+    guid_mapping = {}
+    deserialized = serialization.deserialize_mermaid_full(mermaid, guid_mapping)
+    document = _get_document_instance(turbo_mode=turbo_mode)
+    document.mindmap = deserialized
+    document.create_mindmap()
+    return None
+
+def _deserialize_mermaid_simple(mermaid="", turbo_mode=True):
+    deserialized = serialization.deserialize_mermaid_simple(mermaid)
+    document = _get_document_instance(turbo_mode=turbo_mode)
+    document.mindmap = deserialized
+    document.create_mindmap()
+    return None
+
 def _serialize_markdown(include_notes=True, mode='content', turbo_mode=False):
-    document = _get_document_instance(turbo_mode=True)
+    document = _get_document_instance(turbo_mode=turbo_mode)
     if document.get_mindmap(mode=mode):
         markdown = serialization.serialize_mindmap_markdown(document.mindmap, include_notes=include_notes)
         return markdown
@@ -750,6 +926,62 @@ async def serialize_current_mindmap_to_json(
     except Exception as e:
         print(f"ERROR during serialization to JSON: {e}", file=sys.stderr)
         return {"error": "Serialization Error", "message": f"Failed to serialize to JSON: {e}"}
+
+
+# == Deserialization Methods (Applying Mermaid to MindManager) ==
+
+@mcp.tool()
+async def create_mindmap_from_mermaid(
+    mermaid: str,
+    turbo_mode: bool = True
+) -> Dict[str, str]:
+    """
+    Deserializes a Mermaid mindmap and creates a MindManager mindmap from it.
+
+    Args:
+        mermaid (str): Mermaid text describing the desired mindmap.
+        turbo_mode (bool): Enable turbo mode (text-only operations). Defaults to True.
+
+    Returns:
+        Dict[str, str]: Status dictionary indicating success or error details.
+    """
+    if not mermaid or not mermaid.strip():
+        return {"error": "Invalid Input", "message": "Mermaid content is required."}
+
+    try:
+        print("Creating mindmap from Mermaid diagram (full).", file=sys.stderr)
+        _deserialize_mermaid(mermaid=mermaid, turbo_mode=turbo_mode)
+        print("Mindmap created from Mermaid diagram.", file=sys.stderr)
+        return {"status": "success", "message": "Mindmap created from Mermaid diagram."}
+    except Exception as e:
+        return _handle_mindmanager_error("create_mindmap_from_mermaid", e)
+
+
+@mcp.tool()
+async def create_mindmap_from_mermaid_simple(
+    mermaid: str,
+    turbo_mode: bool = True
+) -> Dict[str, str]:
+    """
+    Deserializes a Mermaid mindmap in simplified syntax and creates a MindManager mindmap from it.
+
+    Args:
+        mermaid (str): Mermaid text describing the desired mindmap.
+        turbo_mode (bool): Enable turbo mode (text-only operations). Defaults to True.
+
+    Returns:
+        Dict[str, str]: Status dictionary indicating success or error details.
+    """
+    if not mermaid or not mermaid.strip():
+        return {"error": "Invalid Input", "message": "Mermaid content is required."}
+
+    try:
+        print("Creating mindmap from Mermaid diagram (simple).", file=sys.stderr)
+        _deserialize_mermaid_simple(mermaid=mermaid, turbo_mode=turbo_mode)
+        print("Mindmap created from Mermaid diagram (simple).", file=sys.stderr)
+        return {"status": "success", "message": "Mindmap created from Mermaid diagram (simple)."}
+    except Exception as e:
+        return _handle_mindmanager_error("create_mindmap_from_mermaid_simple", e)
 
 
 @mcp.tool()

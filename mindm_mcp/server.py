@@ -316,7 +316,7 @@ async def serialize_current_mindmap_to_markdown(
 
     Args:
         include_notes (bool): If True, include notes in the serialization. Defaults to True.
-        mode (str): Detail level ('full', 'content', 'text'). Defaults to 'full'.
+        mode (str): Detail level ('full', 'content', 'text'). Defaults to 'content'.
         turbo_mode (bool): Enable turbo mode (text only). Defaults to False.
 
     Returns:
@@ -335,7 +335,7 @@ async def serialize_current_mindmap_to_markdown(
 @mcp.tool()
 async def serialize_current_mindmap_to_json(
     ignore_rtf: bool = True,
-    mode: str = 'content',
+    mode: str = 'full',
     turbo_mode: bool = True
 ) -> Union[Dict[str, Any], Dict[str, str]]:
     """
@@ -363,21 +363,19 @@ async def serialize_current_mindmap_to_json(
 
 @mcp.tool()
 async def create_mindmap_from_mermaid(
-    mermaid: str,
-    turbo_mode: bool = False
+    mermaid: str
 ) -> Dict[str, str]:
     """
-    Deserializes a Mermaid mindmap and creates a MindManager mindmap from it.
+    Deserializes a Mermaid mindmap and creates a MindManager mindmap from it (caller must follow the guidance).
 
     Args:
-        mermaid (str): Mermaid text describing the desired mindmap.
-        turbo_mode (bool): Enable turbo mode (text-only operations). Defaults to True.
-
+        mermaid (str): Mermaid text describing the desired mindmap with supported topic metadata, e.g. `[Topic] %% {"id": n, "notes": {"text": "Notes"}, "links": [{"text": "label", "url": "https://example.com"}], "references": [{"id_1": i, "id_2": j, "direction": 1}], "image": {"text": "C:\\path\\to\\image.png"}, "icons": [{"text": "StockIcon-36", "is_stock_icon": true, "index": 36}], "tags": ["tag1"]}`
+    
     Guidance for callers constructing `mermaid`:
-    - Every line must be valid Mermaid and contain at least a topic label, e.g. `[Topic]`.
+    - Every line must be syntactically correct Mermaid code and contain at least a topic label, e.g. `[Topic]`.
     - For the root topic just use the label, e.g. `[Central Topic]`
     - Full syntax supports attaching metadata via JSON after `%%` on the same line, e.g.
-      `[Topic] %% {"id": 1, "notes": {"text": "Notes"}, "links": [{"text": "label", "url": "https://example.com"}], "references": [{"id_1": 1, "id_2": 2, "direction": 1}], "image": {"text": "C:\\path\\to\\image.png"}, "icons": [{"text": "StockIcon-36", "is_stock_icon": true, "index": 36}], "tags": ["tag1"]}`
+      `[Topic] %% {"id": n, "notes": {"text": "Notes"}, "links": [{"text": "label", "url": "https://example.com"}], "references": [{"id_1": i, "id_2": j, "direction": 1}], "image": {"text": "C:\\path\\to\\image.png"}, "icons": [{"text": "StockIcon-36", "is_stock_icon": true, "index": m}], "tags": ["tag1"]}`
     - For icons, use `icons`: `[{"text": "StockIcon-<index>", "is_stock_icon": true, "index": <index>}]` where available options for stock icons are: Arrow Down(66), Arrow Left(65), Arrow Right(37), Arrow Up(36), Bomb(51), Book(67), Broken Connection(69), Calendar(8), Camera(41), Cellphone(40), Check(62), Clock(7), Coffee Cup(59), Dollar(15), Email(10), Emergency(49), Euro(16), Exclamation Mark(44), Fax(42), Flag Black(20), Flag Blue(18), Flag Green(19), Flag Orange(21), Flag Purple(23), Flag Red(17), Flag Yellow(22), Folder(71), Glasses(53), Hourglass(48), House(13), Information(70), Judge Hammer(54), Key(52), Letter(9), Lightbulb(58), Magnifying Glass(68), Mailbox(11), Marker 1(25), Marker 2(26), Marker 3(27), Marker 4(28), Marker 5(29), Marker 6(30), Marker 7(31), Meeting(61), Megaphone(12), No Entry(50), Note(63), On Hold(47), Padlock Locked(34), Padlock Unlocked(35), Phone(39), Question Mark(45), Redo(57), Resource 1(32), Resource 2(33), Rocket(55), Rolodex(14), Scales(56), Smiley Angry(5), Smiley Happy(2), Smiley Neutral(3), Smiley Sad(4), Smiley Screaming(6), Stop(43), Thumbs Down(64), Thumbs Up(46), Traffic Lights Red(24), Two End Arrow(38), Two Feet(60).
 
     Returns:
@@ -388,9 +386,10 @@ async def create_mindmap_from_mermaid(
 
     try:
         print("Creating mindmap from Mermaid diagram (full).", file=sys.stderr)
-        _deserialize_mermaid(mermaid=mermaid, turbo_mode=turbo_mode)
+        _deserialize_mermaid(mermaid=mermaid, turbo_mode=False)
         print("Mindmap created from Mermaid diagram.", file=sys.stderr)
-        return {"status": "success", "message": "Mindmap created from Mermaid diagram."}
+        ret_val = {"status": "success", "message": "Mindmap created from Mermaid diagram."}
+        return ret_val
     except Exception as e:
         return _handle_mindmanager_error("create_mindmap_from_mermaid", e)
 

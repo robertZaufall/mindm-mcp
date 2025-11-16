@@ -11,17 +11,21 @@ This server allows you to programmatically interact with MindManager through the
 
 ### Animated examples (using Codex in VSCode on Windows)
 
-Cloning a map including all supported topic properties:
-![MindManager MCP in Codex](assets/clone_map_anim.gif) 
+- Example
+Refining a single topic including tags, icons for the new topics: 
+
+_get the current Mindmanager mindmap as mermaid (full), refine the given topics at least two levels deep (not just topics), add a tag "Important" to the 3 top most important topics and add corresponding stock icons to every topic but the central topic and create the new MindManager mindmap_
+
+![MindManager MCP in Codex](assets/refine_map_anim2.gif) 
  
+- Example
 Refining a single topic including generating text in notes for the new topics: 
 ![MindManager MCP in Codex](assets/refine_map_anim.gif) 
 
-### Example (Codex GUI in VSCode on macOS):
-
-Adding emojis to all topics: 
-![MindManager MCP in Codex](assets/codex_gui.png)
-
+- Example
+Cloning a map including all supported topic properties:
+![MindManager MCP in Codex](assets/clone_map_anim.gif) 
+ 
 ## Other examples
 
 ### Client

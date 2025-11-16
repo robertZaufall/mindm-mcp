@@ -6,7 +6,7 @@
             "name": "MCP Dev Server (uv)",
             "type": "node-terminal",
             "request": "launch",
-            "command": "uv run --with mind --with fastmcp --with markdown-it-py mcp dev mindm_mcp/server.py",
+            "command": "uv run --with mindm --with fastmcp --with markdown-it-py mcp dev mindm_mcp/server.py",
             "cwd": "${workspaceFolder}"
         }
     ]

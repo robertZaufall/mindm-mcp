@@ -1,3 +1,6 @@
+> [!WARNING]
+> **Deprecated:** This MCP will not be developed further. Please use the Codex/Claude skills from `https://github.com/robertZaufall/mindm` instead.
+
 # MindManager MCP Server
 
 A Model Context Protocol (MCP) server implementation for the `mindm` library, providing a standardized interface to interact with MindManager on Windows and macOS.  

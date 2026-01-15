@@ -1,5 +1,5 @@
 > [!WARNING]
-> **Deprecated:** This MCP will not be developed further. Please use the Codex/Claude skills from `https://github.com/robertZaufall/mindm` instead.
+> **Deprecated:** This MCP will not be developed further. Please use the Codex/Claude skills from https://github.com/robertZaufall/mindm instead.
 
 # MindManager MCP Server
 
